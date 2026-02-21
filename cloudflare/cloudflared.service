@@ -1,0 +1,23 @@
+# /etc/systemd/system/cloudflared.service
+# Autostart cloudflared tunnel on boot on your local machine
+#
+# Install: sudo systemctl enable cloudflared && sudo systemctl start cloudflared
+
+[Unit]
+Description=Cloudflare Tunnel - UniFi Toolkit
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/cloudflared tunnel --config /etc/cloudflared/config.yml run
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cloudflared
+
+[Install]
+WantedBy=multi-user.target

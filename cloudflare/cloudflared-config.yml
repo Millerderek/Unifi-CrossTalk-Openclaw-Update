@@ -1,0 +1,35 @@
+# ─── Cloudflare Tunnel Config ─────────────────────────────────────────────────
+# File: /etc/cloudflared/config.yml  (on your LOCAL machine)
+#
+# This exposes your local UI Toolkit (port 8000) to the internet via
+# a Cloudflare Tunnel, with NO open firewall ports needed.
+#
+# Prerequisites:
+#   1. cloudflared installed on local machine
+#   2. A domain added to Cloudflare (free account works)
+#   3. Run: cloudflared tunnel login
+#   4. Run: cloudflared tunnel create unifi-toolkit
+#   5. Copy the tunnel UUID from the output into tunnel: below
+
+tunnel: YOUR_TUNNEL_UUID_HERE
+credentials-file: /root/.cloudflared/YOUR_TUNNEL_UUID_HERE.json
+
+# Ingress rules - route traffic from your domain to local services
+ingress:
+  # UI Toolkit dashboard + API
+  - hostname: toolkit.yourdomain.com
+    service: http://localhost:8000
+
+  # Activity Log webhooks (Access & Protect need to POST here)
+  # These MUST be reachable from your UniFi Cloud Key or Dream Machine
+  - hostname: webhooks.yourdomain.com
+    service: http://localhost:8000
+    originRequest:
+      # Increase timeout for long-polling webhook connections
+      connectTimeout: 30s
+      tlsTimeout: 30s
+      tcpKeepAlive: 30s
+      noTLSVerify: false
+
+  # Catch-all (required by cloudflared)
+  - service: http_status:404
