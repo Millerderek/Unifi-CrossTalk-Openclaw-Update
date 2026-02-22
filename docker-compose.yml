@@ -1,0 +1,117 @@
+version: "3.9"
+
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: toolkit-tailscale
+    hostname: unifi-toolkit-vps
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    volumes:
+      - unifi_tailscale-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_EXTRA_ARGS: "--accept-routes"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+    networks:
+      - internal
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: toolkit-app
+    restart: unless-stopped
+    network_mode: "service:tailscale"
+    depends_on:
+      - tailscale
+    volumes:
+      - /opt/unifi-toolkit/data:/app/data:rw
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "sqlite+aiosqlite:///./data/unifi_toolkit.db"
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8000"
+      PUBLIC_URL: ${PUBLIC_URL}
+      WEBHOOK_SECRET_ACCESS: ${WEBHOOK_SECRET_ACCESS:-}
+      WEBHOOK_SECRET_PROTECT: ${WEBHOOK_SECRET_PROTECT:-}
+      SAML_SP_ENTITY_ID: ${SAML_SP_ENTITY_ID:-}
+      SAML_SP_ACS_URL: ${SAML_SP_ACS_URL:-}
+      SAML_IDP_ENTITY_ID: ${SAML_IDP_ENTITY_ID:-}
+      SAML_IDP_SSO_URL: ${SAML_IDP_SSO_URL:-}
+      SAML_IDP_CERT: ${SAML_IDP_CERT:-}
+      SAML_ADMIN_GROUPS: ${SAML_ADMIN_GROUPS:-}
+      SAML_SESSION_HOURS: ${SAML_SESSION_HOURS:-8}
+      SAML_COOKIE_SECURE: "true"
+      SAML_STRICT: "true"
+      SAML_DEBUG: "false"
+      SCIM_BEARER_TOKEN: ${SCIM_BEARER_TOKEN:-}
+      UNIFI_API_KEY: ${UNIFI_API_KEY:-}
+      UNIFI_FABRIC_ID: ${UNIFI_FABRIC_ID:-}
+      PEOPLE_CACHE_TTL_HOURS: ${PEOPLE_CACHE_TTL_HOURS:-1}
+      UNIFI_CONTROLLER_URL: ${UNIFI_CONTROLLER_URL:-}
+      UNIFI_USERNAME: ${UNIFI_USERNAME:-}
+      UNIFI_PASSWORD: ${UNIFI_PASSWORD:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PYTHONUNBUFFERED: "1"
+      UNIFI_SITE_ID: ${UNIFI_SITE_ID:-default}
+      UNIFI_VERIFY_SSL: ${UNIFI_VERIFY_SSL:-true}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/activity/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: toolkit-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - unifi_certbot-www:/var/www/certbot:ro
+      - unifi_certbot-certs:/etc/letsencrypt:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - tailscale
+      - app
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: toolkit-certbot
+    volumes:
+      - unifi_certbot-www:/var/www/certbot
+      - unifi_certbot-certs:/etc/letsencrypt
+    entrypoint: >
+      sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    networks:
+      - internal
+
+volumes:
+  unifi_tailscale-state:
+    external: true
+  unifi_certbot-www:
+    external: true
+  unifi_certbot-certs:
+    external: true
+
+networks:
+  internal:
+    driver: bridge

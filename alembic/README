@@ -1,0 +1,58 @@
+# Alembic Migrations for UniFi Toolkit
+
+This directory contains database migration scripts managed by Alembic.
+
+## Creating a New Migration
+
+To auto-generate a migration after making model changes:
+
+```bash
+alembic revision --autogenerate -m "Description of changes"
+```
+
+To create an empty migration (for manual SQL):
+
+```bash
+alembic revision -m "Description of changes"
+```
+
+## Running Migrations
+
+To upgrade to the latest version:
+
+```bash
+alembic upgrade head
+```
+
+To upgrade to a specific version:
+
+```bash
+alembic upgrade <revision_id>
+```
+
+To downgrade one version:
+
+```bash
+alembic downgrade -1
+```
+
+## Checking Migration Status
+
+To see current database version:
+
+```bash
+alembic current
+```
+
+To see migration history:
+
+```bash
+alembic history
+```
+
+## Important Notes
+
+- Always review auto-generated migrations before running them
+- Test migrations in a development environment first
+- The database URL is loaded from your .env file
+- SQLite is used by default (supports batch operations for ALTER TABLE)

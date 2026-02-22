@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity Log - UI Toolkit</title>
+<style>
+/* ── Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --border:    #30363d;
+  --muted:     #8b949e;
+  --text:      #e6edf3;
+  --blue:      #58a6ff;
+  --green:     #3fb950;
+  --amber:     #d29922;
+  --red:       #f85149;
+  --purple:    #bc8cff;
+  --access-bg: #23863622;
+  --access-fg: #3fb950;
+  --protect-bg:#d2992222;
+  --protect-fg:#d29922;
+}
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── Nav ── */
+.topnav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; height: 56px; gap: 8px; }
+.topnav .brand { font-weight: 700; font-size: 16px; margin-right: 24px; display: flex; align-items: center; gap: 8px; }
+.topnav .brand .icon { width: 28px; height: 28px; background: linear-gradient(135deg, var(--green), var(--amber)); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.nav-link { color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 14px; transition: all .15s; }
+.nav-link:hover, .nav-link.active { color: var(--text); background: rgba(255,255,255,.06); }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.live-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.85)} }
+
+/* ── Layout ── */
+main { max-width: 1440px; margin: 0 auto; padding: 24px; }
+
+/* ── Stat Cards ── */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+.stat-card .value { font-size: 36px; font-weight: 700; line-height: 1; }
+.stat-card .sub   { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.c-blue   { color: var(--blue); }
+.c-green  { color: var(--green); }
+.c-amber  { color: var(--amber); }
+.c-red    { color: var(--red); }
+.c-purple { color: var(--purple); }
+
+/* ── Panels ── */
+.panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media(max-width:900px){ .panel-row { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.panel-title { font-size: 14px; font-weight: 600; }
+.panel-body { padding: 0; }
+
+/* ── Filters ── */
+.filters { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.filter-group label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
+.filter-group select,
+.filter-group input  { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; outline: none; }
+.filter-group select:focus,
+.filter-group input:focus { border-color: var(--blue); }
+.btn { border: none; padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: opacity .15s; }
+.btn:hover { opacity: .85; }
+.btn-primary { background: #1f6feb; color: #fff; }
+.btn-secondary { background: #21262d; color: var(--text); border: 1px solid var(--border); }
+.btn-danger { background: #da3633; color: #fff; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* ── Events Table ── */
+.events-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #21262d; text-align: left; padding: 10px 14px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #1c2128; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.02); }
+.td-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.td-meta { color: var(--muted); font-size: 11px; }
+.td-user strong { display: block; }
+.td-user span { color: var(--muted); font-size: 11px; }
+
+/* ── Tags / Badges ── */
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.tag-access  { background: var(--access-bg);  color: var(--access-fg);  border: 1px solid #23863640; }
+.tag-protect { background: var(--protect-bg); color: var(--protect-fg); border: 1px solid #d2992240; }
+.tag-granted { background: #23863618; color: var(--green); }
+.tag-denied  { background: #f8514918; color: var(--red); }
+.tag-motion  { background: #bc8cff18; color: var(--purple); }
+.tag-neutral { background: rgba(139,148,158,.12); color: var(--muted); }
+
+/* ── Pagination ── */
+.pagination { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.pagination span { font-size: 13px; color: var(--muted); }
+.pagination button { background: #21262d; border: 1px solid var(--border); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.pagination button:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ── Mini list ── */
+.mini-list { list-style: none; }
+.mini-list li { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid #1c2128; font-size: 13px; }
+.mini-list li:last-child { border-bottom: none; }
+.mini-list .ml-label { flex: 1; }
+.mini-list .ml-count { font-weight: 600; color: var(--blue); }
+
+/* ── Settings Modal ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: min(500px, 95vw); overflow: hidden; }
+.modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-header h3 { font-size: 15px; font-weight: 600; }
+.modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; }
+.modal-body { padding: 20px; }
+.form-row { margin-bottom: 16px; }
+.form-row label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.form-row input, .form-row select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; }
+.form-row input:focus, .form-row select:focus { border-color: var(--blue); }
+.checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.checkbox-item input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--green); }
+.section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin: 12px 0 8px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Toast ── */
+.toast { position: fixed; bottom: 24px; right: 24px; background: #1f6feb; color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 13px; z-index: 200; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; }
+.toast.show { opacity: 1; transform: none; }
+.toast.error { background: var(--red); }
+
+/* ── Empty ── */
+.empty-state { text-align: center; padding: 48px 24px; color: var(--muted); font-size: 14px; }
+.empty-state .emoji { font-size: 36px; display: block; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="brand">
+    <div class="icon">🔭</div>
+    Activity Log
+  </div>
+  <a class="nav-link active" href="/activity/">Events</a>
+  <a class="nav-link" href="#" onclick="openSettings(); return false;">Settings</a>
+  <div class="nav-right">
+    <div class="live-badge"><div class="live-dot"></div><span id="refresh-label">Live · 30s</span></div>
+    <button class="btn btn-secondary btn-sm" onclick="loadAll()">↺ Refresh</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- Stat cards -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="label">Total Events (24h)</div><div class="value c-blue" id="stat-total">—</div><div class="sub">all sources</div></div>
+    <div class="stat-card"><div class="label">Access Events</div><div class="value c-green" id="stat-access">—</div><div class="sub">doors & badges</div></div>
+    <div class="stat-card"><div class="label">Protect Events</div><div class="value c-amber" id="stat-protect">—</div><div class="sub">cameras & motion</div></div>
+    <div class="stat-card"><div class="label">Access Denied</div><div class="value c-red" id="stat-denied">—</div><div class="sub">last 24h</div></div>
+    <div class="stat-card"><div class="label">Person Detections</div><div class="value c-purple" id="stat-persons">—</div><div class="sub">smart detect</div></div>
+  </div>
+
+  <!-- Top users + recent access panels -->
+  <div class="panel-row">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Top Users (24h)</span>
+      </div>
+      <div class="panel-body">
+        <ul class="mini-list" id="top-users">
+          <li><span class="ml-label c-muted">Loading…</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Recent Access Events</span>
+      </div>
+      <div class="panel-body">
+        <ul class="mini-list" id="recent-access">
+          <li><span class="ml-label c-muted">Loading…</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>Source</label>
+      <select id="f-source">
+        <option value="">All</option>
+        <option value="access">Access</option>
+        <option value="protect">Protect</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Action</label>
+      <input id="f-action" placeholder="e.g. denied, person" style="width:160px">
+    </div>
+    <div class="filter-group">
+      <label>User / Device</label>
+      <input id="f-user" placeholder="Name or ID" style="width:160px">
+    </div>
+    <div class="filter-group">
+      <label>Location</label>
+      <input id="f-location" placeholder="Door or Camera" style="width:160px">
+    </div>
+    <div class="filter-group">
+      <label>Since</label>
+      <input id="f-since" type="datetime-local" style="width:190px">
+    </div>
+    <button class="btn btn-primary" onclick="loadEvents(0)">🔍 Filter</button>
+    <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+  </div>
+
+  <!-- Events table -->
+  <div class="events-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Source</th>
+          <th>Action</th>
+          <th>User / Device</th>
+          <th>Location</th>
+          <th>Raw Type</th>
+        </tr>
+      </thead>
+      <tbody id="events-body">
+        <tr><td colspan="6" class="empty-state"><span class="emoji">📡</span>Loading events…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    <button id="btn-prev" onclick="changePage(-1)" disabled>← Prev</button>
+    <span id="page-info">Page 1</span>
+    <button id="btn-next" onclick="changePage(1)">Next →</button>
+  </div>
+
+</main>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚙️ Activity Log Settings</h3>
+      <button class="modal-close" onclick="closeSettings()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Webhook URL (Slack / Discord / Generic)</label>
+        <input id="s-url" type="url" placeholder="https://hooks.slack.com/...">
+      </div>
+      <div class="form-row">
+        <label>Webhook Type</label>
+        <select id="s-type">
+          <option value="slack">Slack</option>
+          <option value="discord">Discord</option>
+          <option value="generic">Generic JSON</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>
+          <input type="checkbox" id="s-enabled" style="width:auto;margin-right:6px">
+          Enable notifications
+        </label>
+      </div>
+
+      <div class="section-label">🚪 Access Events</div>
+      <div class="checkbox-grid">
+        <label class="checkbox-item"><input type="checkbox" id="s-granted"> Access Granted</label>
+        <label class="checkbox-item"><input type="checkbox" id="s-denied"> Access Denied</label>
+        <label class="checkbox-item"><input type="checkbox" id="s-held"> Door Held Open</label>
+      </div>
+
+      <div class="section-label">📹 Protect Events</div>
+      <div class="checkbox-grid">
+        <label class="checkbox-item"><input type="checkbox" id="s-person"> Person Detected</label>
+        <label class="checkbox-item"><input type="checkbox" id="s-vehicle"> Vehicle Detected</label>
+        <label class="checkbox-item"><input type="checkbox" id="s-ring"> Doorbell Ring</label>
+        <label class="checkbox-item"><input type="checkbox" id="s-motion"> Motion Detected</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 50;
+let offset = 0;
+let total  = 0;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { month:'short', day:'numeric',
+    hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function sourceTag(src) {
+  return src === 'access'
+    ? '<span class="tag tag-access">🚪 Access</span>'
+    : '<span class="tag tag-protect">📹 Protect</span>';
+}
+
+function actionTag(action) {
+  if (!action) return '<span class="tag tag-neutral">—</span>';
+  const a = action.toLowerCase();
+  if (a.includes('granted') || a.includes('unlock'))
+    return `<span class="tag tag-granted">✅ ${fmtAction(action)}</span>`;
+  if (a.includes('denied'))
+    return `<span class="tag tag-denied">🚫 ${fmtAction(action)}</span>`;
+  if (a.includes('person') || a.includes('motion') || a.includes('ring'))
+    return `<span class="tag tag-motion">👁️ ${fmtAction(action)}</span>`;
+  return `<span class="tag tag-neutral">${fmtAction(action)}</span>`;
+}
+
+function fmtAction(a) {
+  return (a || '').replace(/_/g,' ').replace(/^smart detect:/,'detect: ');
+}
+
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (err ? ' error' : '') + ' show';
+  setTimeout(() => el.className = 'toast', 3000);
+}
+
+// ── Summary ──────────────────────────────────────────────────────────────────
+async function loadSummary() {
+  const r = await fetch('/activity/api/events/summary');
+  if (!r.ok) return;
+  const d = await r.json();
+
+  const t = d.totals_24h || {};
+  document.getElementById('stat-access').textContent  = t.access  ?? 0;
+  document.getElementById('stat-protect').textContent = t.protect ?? 0;
+  document.getElementById('stat-total').textContent   = Object.values(t).reduce((a,b)=>a+b,0);
+
+  // Denied count
+  const denied = (d.breakdown||[]).filter(b=>b.action==='access_denied').reduce((s,b)=>s+b.count,0);
+  document.getElementById('stat-denied').textContent = denied;
+
+  // Person count
+  const persons = (d.breakdown||[]).filter(b=>b.action&&b.action.includes('person')).reduce((s,b)=>s+b.count,0);
+  document.getElementById('stat-persons').textContent = persons;
+
+  // Top users
+  const ul = document.getElementById('top-users');
+  ul.innerHTML = (d.top_users||[]).length
+    ? d.top_users.slice(0,8).map(u => `
+        <li>
+          <span class="ml-label">${u.user_name||u.user_id||'Unknown'}</span>
+          <span class="ml-count">${u.count}</span>
+        </li>`).join('')
+    : '<li><span class="ml-label" style="color:var(--muted)">No data yet</span></li>';
+
+  // Recent access
+  const ra = document.getElementById('recent-access');
+  const accessEvts = (d.recent_events||[]).filter(e=>e.source==='access').slice(0,6);
+  ra.innerHTML = accessEvts.length
+    ? accessEvts.map(e => `
+        <li>
+          <span>${actionTag(e.action)}</span>
+          <span class="ml-label">${e.user_name||e.user_id||'?'} → ${e.location||'?'}</span>
+          <span style="font-size:11px;color:var(--muted)">${fmt(e.occurred_at)}</span>
+        </li>`).join('')
+    : '<li><span class="ml-label" style="color:var(--muted)">No access events yet</span></li>';
+}
+
+// ── Events ───────────────────────────────────────────────────────────────────
+async function loadEvents(newOffset=0) {
+  offset = newOffset;
+  const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
+  const src = document.getElementById('f-source').value;
+  const act = document.getElementById('f-action').value;
+  const usr = document.getElementById('f-user').value;
+  const loc = document.getElementById('f-location').value;
+  const snc = document.getElementById('f-since').value;
+  if (src) params.set('source', src);
+  if (act) params.set('action', act);
+  if (usr) params.set('user_id', usr);
+  if (loc) params.set('location', loc);
+  if (snc) params.set('since', new Date(snc).toISOString());
+
+  const r = await fetch('/activity/api/events?' + params);
+  const d = await r.json();
+  total = d.total;
+
+  const tbody = document.getElementById('events-body');
+  if (!d.events.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">
+      <span class="emoji">📭</span>No events match your filters</td></tr>`;
+  } else {
+    tbody.innerHTML = d.events.map(e => `
+      <tr>
+        <td class="td-time">${fmt(e.occurred_at)}</td>
+        <td>${sourceTag(e.source)}</td>
+        <td>${actionTag(e.action)}</td>
+        <td class="td-user">
+          <strong>${e.user_name||'—'}</strong>
+          <span>${e.user_id||''}</span>
+        </td>
+        <td>${e.location||'<span style="color:var(--muted)">—</span>'}</td>
+        <td class="td-meta">${e.raw_event_type||''}</td>
+      </tr>`).join('');
+  }
+
+  const page = Math.floor(offset/PAGE_SIZE)+1;
+  const totalPages = Math.ceil(total/PAGE_SIZE)||1;
+  document.getElementById('page-info').textContent = `Page ${page} of ${totalPages} · ${total} total`;
+  document.getElementById('btn-prev').disabled = offset === 0;
+  document.getElementById('btn-next').disabled = offset + PAGE_SIZE >= total;
+}
+
+function changePage(dir) { loadEvents(offset + dir * PAGE_SIZE); }
+
+function clearFilters() {
+  ['f-source','f-action','f-user','f-location','f-since'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  loadEvents(0);
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+async function openSettings() {
+  const r = await fetch('/activity/api/settings');
+  const s = await r.json();
+  document.getElementById('s-url').value     = s.webhook_url || '';
+  document.getElementById('s-type').value    = s.webhook_type || 'slack';
+  document.getElementById('s-enabled').checked  = !!s.enabled;
+  document.getElementById('s-granted').checked  = !!s.event_access_granted;
+  document.getElementById('s-denied').checked   = !!s.event_access_denied;
+  document.getElementById('s-held').checked     = !!s.event_door_held_open;
+  document.getElementById('s-person').checked   = !!s.event_person_detected;
+  document.getElementById('s-vehicle').checked  = !!s.event_vehicle_detected;
+  document.getElementById('s-ring').checked     = !!s.event_doorbell_ring;
+  document.getElementById('s-motion').checked   = !!s.event_motion;
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+
+async function saveSettings() {
+  const body = {
+    webhook_url:           document.getElementById('s-url').value,
+    webhook_type:          document.getElementById('s-type').value,
+    enabled:               document.getElementById('s-enabled').checked,
+    event_access_granted:  document.getElementById('s-granted').checked,
+    event_access_denied:   document.getElementById('s-denied').checked,
+    event_door_held_open:  document.getElementById('s-held').checked,
+    event_person_detected: document.getElementById('s-person').checked,
+    event_vehicle_detected:document.getElementById('s-vehicle').checked,
+    event_doorbell_ring:   document.getElementById('s-ring').checked,
+    event_motion:          document.getElementById('s-motion').checked,
+  };
+  const r = await fetch('/activity/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (r.ok) {
+    closeSettings();
+    toast('Settings saved');
+  } else {
+    toast('Failed to save settings', true);
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('settings-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSettings();
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+function loadAll() { loadSummary(); loadEvents(offset); }
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>

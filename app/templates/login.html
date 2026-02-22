@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - UI Toolkit</title>
+    <link rel="icon" type="image/jpeg" href="/static/images/favicon16x16.jpg">
+    <style>
+        :root {
+            /* Crosstalk Solutions Brand Colors */
+            --ct-blue: #2B3990;
+            --ct-orange: #F15A29;
+            --ct-grey: #939598;
+
+            /* Light Mode */
+            --primary-color: #2B3990;
+            --accent-color: #F15A29;
+            --secondary-color: #939598;
+            --background: #f9fafb;
+            --surface: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --error-bg: rgba(239, 68, 68, 0.1);
+            --error-border: rgba(239, 68, 68, 0.3);
+            --error-text: #dc2626;
+            --warning-bg: rgba(245, 158, 11, 0.1);
+            --warning-border: rgba(245, 158, 11, 0.3);
+            --warning-text: #d97706;
+        }
+
+        /* Dark Mode */
+        :root[data-theme="dark"] {
+            --primary-color: #4B5FBB;
+            --accent-color: #F15A29;
+            --secondary-color: #939598;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+            --error-bg: rgba(239, 68, 68, 0.15);
+            --error-border: rgba(239, 68, 68, 0.4);
+            --error-text: #f87171;
+            --warning-bg: rgba(245, 158, 11, 0.15);
+            --warning-border: rgba(245, 158, 11, 0.4);
+            --warning-text: #fbbf24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .login-card {
+            background: var(--surface);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            padding: 2.5rem;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .logo img {
+            max-width: 200px;
+            height: auto;
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .title h1 {
+            font-size: 1.75rem;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 2rem;
+        }
+
+        .alert {
+            padding: 0.875rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .alert-icon {
+            flex-shrink: 0;
+            font-size: 1rem;
+        }
+
+        .alert-error {
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            color: var(--error-text);
+        }
+
+        .alert-warning {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            color: var(--warning-text);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(43, 57, 144, 0.1);
+        }
+
+        :root[data-theme="dark"] .form-group input:focus {
+            box-shadow: 0 0 0 3px rgba(75, 95, 187, 0.2);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: var(--ct-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1e2d75;
+            transform: translateY(-1px);
+        }
+
+        :root[data-theme="dark"] .btn-primary {
+            background: var(--primary-color);
+        }
+
+        :root[data-theme="dark"] .btn-primary:hover {
+            background: #5b6fc9;
+        }
+
+        .btn-primary:disabled {
+            background: var(--secondary-color);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .footer p {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .theme-toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .theme-toggle-btn:hover {
+            background: var(--border-color);
+            transform: scale(1.05);
+        }
+
+        /* Rate limit countdown */
+        .countdown {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            body {
+                padding: 1rem;
+            }
+
+            .login-card {
+                padding: 1.5rem;
+            }
+
+            .logo img {
+                max-width: 160px;
+            }
+
+            .title h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+    <script>
+        // Apply saved theme immediately to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('unifi-toolkit-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+</head>
+<body>
+    <!-- Theme Toggle -->
+    <div class="theme-toggle">
+        <button class="theme-toggle-btn" id="theme-toggle" title="Toggle dark/light mode">
+            <span id="theme-icon">☀️</span>
+        </button>
+    </div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <img src="/static/images/2022-Crosstalk-Solutions-Logo.png" alt="Crosstalk Solutions">
+            </div>
+
+            <div class="title">
+                <h1>UI Toolkit</h1>
+            </div>
+            <p class="subtitle">Network Management Tools for UniFi</p>
+
+            {% if rate_limited %}
+            <div class="alert alert-warning">
+                <span class="alert-icon">⏳</span>
+                <div>
+                    Too many login attempts. Please wait <span class="countdown" id="countdown">{{ wait_seconds }}</span> seconds before trying again.
+                </div>
+            </div>
+            {% elif error %}
+            <div class="alert alert-error">
+                <span class="alert-icon">⚠️</span>
+                <div>{{ error }}</div>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/login" id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        placeholder="Enter your username"
+                        required
+                        autocomplete="username"
+                        {% if rate_limited %}disabled{% endif %}
+                        autofocus
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Enter your password"
+                        required
+                        autocomplete="current-password"
+                        {% if rate_limited %}disabled{% endif %}
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submit-btn" {% if rate_limited %}disabled{% endif %}>
+                    Sign In
+                </button>
+            </form>
+
+            <div class="footer">
+                <p>
+                    This project is not affiliated with, endorsed by, or sponsored by Ubiquiti Inc.
+                    UniFi is a trademark of Ubiquiti Inc.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle functionality
+        (function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const themeIcon = document.getElementById('theme-icon');
+
+            function updateThemeUI(theme) {
+                themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+            }
+
+            // Initialize UI based on current theme
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            updateThemeUI(currentTheme);
+
+            // Toggle theme on click
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('unifi-toolkit-theme', newTheme);
+                updateThemeUI(newTheme);
+            });
+        })();
+
+        // Rate limit countdown
+        {% if rate_limited %}
+        (function() {
+            const countdownEl = document.getElementById('countdown');
+            const submitBtn = document.getElementById('submit-btn');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            let remaining = {{ wait_seconds }};
+
+            const interval = setInterval(function() {
+                remaining--;
+                countdownEl.textContent = remaining;
+
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    // Re-enable form
+                    submitBtn.disabled = false;
+                    usernameInput.disabled = false;
+                    passwordInput.disabled = false;
+                    // Remove the warning
+                    document.querySelector('.alert-warning').style.display = 'none';
+                    usernameInput.focus();
+                }
+            }, 1000);
+        })();
+        {% endif %}
+    </script>
+</body>
+</html>

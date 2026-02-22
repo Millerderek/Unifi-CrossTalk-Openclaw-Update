@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threat Watch - IDS/IPS Monitoring Dashboard</title>
+    <link rel="icon" type="image/jpeg" href="/static/images/favicon16x16.jpg">
+    <link rel="stylesheet" href="/threats/static/css/styles.css">
+    <script>
+        // Apply saved theme immediately to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('unifi-toolkit-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body>
+    <div x-data="dashboard()" x-init="init()" class="container">
+        <!-- Header -->
+        <header>
+            <div class="header-top">
+                <a href="/" class="back-to-dashboard">
+                    ← Back to Dashboard
+                </a>
+            </div>
+            <h1>🛡️ Threat Watch</h1>
+            <p class="subtitle">IDS/IPS monitoring and threat analysis for UniFi networks</p>
+            <p class="refresh-info">Events refresh automatically every <span x-text="refreshInterval || 60"></span> seconds</p>
+            <div class="status-bar">
+                <span class="status-item">
+                    <span class="label">Last Refresh:</span>
+                    <span x-text="lastRefresh || 'Never'"></span>
+                </span>
+                <span class="status-item">
+                    <span class="label">Total Events:</span>
+                    <span x-text="totalEvents"></span>
+                </span>
+                <span class="status-item">
+                    <span class="label">Last 24h:</span>
+                    <span x-text="events24h"></span>
+                </span>
+                <span class="status-item">
+                    <span class="label">Ignored:</span>
+                    <span x-text="stats.ignoredCount"></span>
+                </span>
+            </div>
+        </header>
+
+        <!-- Gateway/IDS Warning -->
+        {% if not supports_ids_ips %}
+        <div class="gateway-warning">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-content">
+                {% if gateway_info and gateway_info.has_gateway and not gateway_info.supports_ids_ips %}
+                <h3>IDS/IPS Not Available</h3>
+                <p><strong>{{ gateway_error }}</strong></p>
+                <p>Threat Watch monitors IDS/IPS (Intrusion Detection/Prevention System) events. While your site has a gateway device, this model does not include IDS/IPS capabilities.</p>
+                {% elif gateway_error == "Loading gateway information..." %}
+                <h3>Loading...</h3>
+                <p>Checking gateway configuration. Please wait or refresh the page.</p>
+                {% else %}
+                <h3>UniFi Gateway Required</h3>
+                <p><strong>{{ gateway_error }}</strong></p>
+                <p>Threat Watch monitors IDS/IPS (Intrusion Detection/Prevention System) events, which are only available on UniFi Gateway devices such as UDM, UCG, UXG, or USG.</p>
+                <p>Your UniFi site appears to have access points and/or switches, but no gateway device. Without a gateway, there are no IDS/IPS events to monitor.</p>
+                {% endif %}
+                <div class="warning-actions">
+                    <a href="/" class="btn btn-primary">← Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- IDS/IPS Disabled Warning -->
+        {% if supports_ids_ips and gateway_error == "ids_disabled" %}
+        <div class="gateway-warning" style="background-color: var(--warning-bg, #fff3cd); border-color: var(--warning-border, #ffc107);">
+            <div class="warning-icon">ℹ️</div>
+            <div class="warning-content">
+                <h3>IDS/IPS is Disabled</h3>
+                <p>Your gateway ({{ gateway_info.gateway_name }}) supports IDS/IPS, but it is currently <strong>disabled</strong> in your UniFi settings.</p>
+                <p>To enable threat detection:</p>
+                <ol style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                    <li>Open your UniFi Network dashboard</li>
+                    <li>Go to <strong>Settings → Security → Internet Threat Management</strong></li>
+                    <li>Enable <strong>Intrusion Detection</strong> (IDS) or <strong>Intrusion Prevention</strong> (IPS)</li>
+                </ol>
+                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
+                    <strong>IDS</strong> = Detect and alert only | <strong>IPS</strong> = Detect and block threats
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- IDS/IPS Status Badge (when enabled) -->
+        {% if supports_ids_ips and ips_settings and ips_settings.ips_enabled %}
+        <div class="ips-status-badge">
+            <span style="font-size: 1.2rem;">🛡️</span>
+            <span>
+                <strong>{{ ips_settings.ips_mode|upper }}</strong> Mode Active
+                {% if ips_settings.ips_mode == "ids" %}
+                    (Detecting threats)
+                {% elif ips_settings.ips_mode == "ips" or ips_settings.ips_mode == "ipsInline" %}
+                    (Detecting &amp; blocking threats)
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card severity-high">
+                <div class="stat-value" x-text="stats.highCount || 0"></div>
+                <div class="stat-label">High Severity</div>
+            </div>
+            <div class="stat-card severity-medium">
+                <div class="stat-value" x-text="stats.mediumCount || 0"></div>
+                <div class="stat-label">Medium Severity</div>
+            </div>
+            <div class="stat-card severity-low">
+                <div class="stat-value" x-text="stats.lowCount || 0"></div>
+                <div class="stat-label">Low Severity</div>
+            </div>
+            <div class="stat-card highlight">
+                <div class="stat-value" x-text="stats.blockedCount || 0"></div>
+                <div class="stat-label">Blocked</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab" :class="{ active: activeTab === 'events' }" @click="activeTab = 'events'">
+                Events
+            </button>
+            <button class="tab" :class="{ active: activeTab === 'attackers' }" @click="activeTab = 'attackers'">
+                Top Attackers
+            </button>
+            <button class="tab" :class="{ active: activeTab === 'categories' }" @click="activeTab = 'categories'">
+                Categories
+            </button>
+            <button class="tab" :class="{ active: activeTab === 'ignore' }" @click="activeTab = 'ignore'">
+                Ignore List
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Events Tab -->
+            <div x-show="activeTab === 'events'">
+                <!-- Action Bar -->
+                <div class="action-bar">
+                    <button @click="showWebhooks = true" class="btn btn-secondary">
+                        🔔 Webhooks
+                    </button>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="filter-bar">
+                    <select x-model="filters.severity" @change="loadEvents()">
+                        <option value="">All Severities</option>
+                        <option value="1">High</option>
+                        <option value="2">Medium</option>
+                        <option value="3">Low</option>
+                    </select>
+                    <select x-model="filters.action" @change="loadEvents()">
+                        <option value="">All Actions</option>
+                        <option value="block">Blocked</option>
+                        <option value="alert">Alert Only</option>
+                    </select>
+                    <select x-model="filters.category" @change="loadEvents()">
+                        <option value="">All Categories</option>
+                        <template x-for="cat in categories" :key="cat">
+                            <option :value="cat" x-text="cat"></option>
+                        </template>
+                    </select>
+                    <div class="search-box">
+                        <input type="text"
+                               x-model="filters.search"
+                               @keyup.enter="loadEvents()"
+                               placeholder="🔍 Search signatures, IPs..."
+                               class="search-input">
+                    </div>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" x-model="filters.includeIgnored" @change="loadEvents(); loadStats()">
+                        Show Ignored
+                    </label>
+                </div>
+
+                <!-- Events Table -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th @click="sortBy('timestamp')" class="sortable">
+                                    Time
+                                    <span x-show="sortColumn === 'timestamp'" x-text="sortDirection === 'asc' ? '▲' : '▼'"></span>
+                                </th>
+                                <th @click="sortBy('severity')" class="sortable">
+                                    Severity
+                                    <span x-show="sortColumn === 'severity'" x-text="sortDirection === 'asc' ? '▲' : '▼'"></span>
+                                </th>
+                                <th>Signature</th>
+                                <th>Category</th>
+                                <th>Source</th>
+                                <th>Destination</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-if="events.length === 0 && !isLoading">
+                                <tr>
+                                    <td colspan="7" class="empty-state">
+                                        No threat events found. Your network may be secure, or IDS/IPS may not be enabled on your UniFi gateway.
+                                    </td>
+                                </tr>
+                            </template>
+                            <template x-if="isLoading">
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="loading">
+                                            <div class="spinner"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                            <template x-for="event in events" :key="event.id">
+                                <tr @click="viewEventDetails(event.id)">
+                                    <td x-text="formatDateTime(event.timestamp)"></td>
+                                    <td>
+                                        <span class="severity-badge"
+                                              :class="getSeverityClass(event.severity)"
+                                              x-text="getSeverityLabel(event.severity)">
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div x-text="truncate(event.signature || event.message || 'Unknown', 40)"></div>
+                                    </td>
+                                    <td x-text="event.category || '-'"></td>
+                                    <td>
+                                        <div>
+                                            <code x-text="event.src_ip || '-'"></code>
+                                            <span x-show="event.src_port" x-text="':' + event.src_port"></span>
+                                        </div>
+                                        <div x-show="event.src_country" class="country-badge">
+                                            <span x-text="event.src_country"></span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <code x-text="event.dest_ip || '-'"></code>
+                                            <span x-show="event.dest_port" x-text="':' + event.dest_port"></span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="action-badge"
+                                              :class="event.action === 'block' ? 'action-block' : 'action-alert'"
+                                              x-text="event.action === 'block' ? 'Blocked' : 'Alert'">
+                                        </span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" x-show="totalPages > 1">
+                    <button @click="prevPage()" :disabled="currentPage === 1" class="btn btn-secondary btn-small">
+                        ← Previous
+                    </button>
+                    <span class="pagination-info">
+                        Page <span x-text="currentPage"></span> of <span x-text="totalPages"></span>
+                    </span>
+                    <button @click="nextPage()" :disabled="!hasMore" class="btn btn-secondary btn-small">
+                        Next →
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top Attackers Tab -->
+            <div x-show="activeTab === 'attackers'">
+                <h2 style="margin-bottom: 1rem;">Top Attacking IPs</h2>
+                <div class="attackers-list">
+                    <template x-if="stats.topAttackers && stats.topAttackers.length === 0">
+                        <div class="empty-state">No attack data available yet.</div>
+                    </template>
+                    <template x-for="attacker in stats.topAttackers" :key="attacker.ip">
+                        <div class="attacker-item" @click="filterByIp(attacker.ip)">
+                            <div class="attacker-info">
+                                <div class="attacker-ip" x-text="attacker.ip"></div>
+                                <div class="attacker-meta">
+                                    <span x-show="attacker.country" x-text="attacker.country + ' • '"></span>
+                                    <span x-show="attacker.org" x-text="attacker.org"></span>
+                                    <span x-show="!attacker.country && !attacker.org">Unknown origin</span>
+                                </div>
+                            </div>
+                            <div class="attacker-count" x-text="attacker.count + ' events'"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Categories Tab -->
+            <div x-show="activeTab === 'categories'">
+                <h2 style="margin-bottom: 1rem;">Events by Category</h2>
+                <div class="categories-grid">
+                    <template x-if="stats.byCategory && stats.byCategory.length === 0">
+                        <div class="empty-state">No category data available yet.</div>
+                    </template>
+                    <template x-for="cat in stats.byCategory" :key="cat.category">
+                        <div class="category-item" @click="filterByCategory(cat.category)">
+                            <div class="category-name" x-text="cat.category"></div>
+                            <div class="category-count" x-text="cat.count"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Ignore List Tab -->
+            <div x-show="activeTab === 'ignore'">
+                <div class="ignore-list-header">
+                    <div>
+                        <h2 style="margin-bottom: 0.5rem;">Ignore List</h2>
+                        <p class="subtitle">Configure IP addresses to ignore for specific severity levels. Useful for filtering noise from known devices like Home Assistant or other internal services.</p>
+                    </div>
+                    <button @click="resetIgnoreRuleForm(); showAddIgnoreRule = true" class="btn btn-primary">
+                        + Add Ignore Rule
+                    </button>
+                </div>
+
+                <div x-show="ignoreRules.length === 0" class="empty-state">
+                    No ignore rules configured. Events from all sources will be displayed.
+                </div>
+
+                <div x-show="ignoreRules.length > 0" class="ignore-rules-list">
+                    <template x-for="rule in ignoreRules" :key="rule.id">
+                        <div class="ignore-rule-item" :class="{ 'rule-disabled': !rule.enabled }">
+                            <div class="ignore-rule-content">
+                                <div class="ignore-rule-info">
+                                    <div class="ignore-rule-header">
+                                        <code class="ignore-rule-ip" x-text="rule.ip_address"></code>
+                                        <span x-show="rule.description" class="ignore-rule-desc" x-text="' — ' + rule.description"></span>
+                                        <span x-show="!rule.enabled" class="badge badge-disabled">Disabled</span>
+                                    </div>
+                                    <div class="ignore-severities">
+                                        <span>Ignoring:</span>
+                                        <span x-show="rule.ignore_high" class="severity-badge severity-high">High</span>
+                                        <span x-show="rule.ignore_medium" class="severity-badge severity-medium">Medium</span>
+                                        <span x-show="rule.ignore_low" class="severity-badge severity-low">Low</span>
+                                    </div>
+                                    <div class="ignore-match-info">
+                                        Match:
+                                        <span x-show="rule.match_source">Source IP</span>
+                                        <span x-show="rule.match_source && rule.match_destination"> / </span>
+                                        <span x-show="rule.match_destination">Destination IP</span>
+                                    </div>
+                                    <div class="ignore-rule-stats">
+                                        <span x-text="rule.events_ignored + ' events ignored'"></span>
+                                        <span x-show="rule.last_matched">
+                                            • Last matched: <span x-text="formatDateTime(rule.last_matched)"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="ignore-rule-actions">
+                                    <button @click="editIgnoreRule(rule)" class="btn btn-sm btn-secondary">Edit</button>
+                                    <button @click="deleteIgnoreRule(rule.id)" class="btn btn-sm btn-danger">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </main>
+
+        <!-- Event Details Modal -->
+        <div x-show="showEventDetails"
+             @click.self="showEventDetails = false"
+             class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Threat Event Details</h2>
+                    <button @click="showEventDetails = false" class="close-btn">×</button>
+                </div>
+                <div class="modal-body" x-show="eventDetails">
+                    <div class="event-details-grid">
+                        <!-- Alert Info -->
+                        <div class="detail-section">
+                            <h3>Alert Information</h3>
+                            <div class="detail-item">
+                                <span class="detail-label">Signature:</span>
+                                <span class="detail-value" x-text="eventDetails?.signature || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Message:</span>
+                                <span class="detail-value" x-text="eventDetails?.message || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Category:</span>
+                                <span class="detail-value" x-text="eventDetails?.category || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Severity:</span>
+                                <span class="detail-value">
+                                    <span class="severity-badge"
+                                          :class="getSeverityClass(eventDetails?.severity)"
+                                          x-text="getSeverityLabel(eventDetails?.severity)">
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Action:</span>
+                                <span class="detail-value">
+                                    <span class="action-badge"
+                                          :class="eventDetails?.action === 'block' ? 'action-block' : 'action-alert'"
+                                          x-text="eventDetails?.action === 'block' ? 'Blocked' : 'Alert'">
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Timestamp:</span>
+                                <span class="detail-value" x-text="formatDateTime(eventDetails?.timestamp)"></span>
+                            </div>
+                        </div>
+
+                        <!-- Source Info -->
+                        <div class="detail-section">
+                            <h3>Source</h3>
+                            <div class="detail-item">
+                                <span class="detail-label">IP Address:</span>
+                                <span class="detail-value"><code x-text="eventDetails?.src_ip || '-'"></code></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Port:</span>
+                                <span class="detail-value" x-text="eventDetails?.src_port || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">MAC:</span>
+                                <span class="detail-value"><code x-text="eventDetails?.src_mac || '-'"></code></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Country:</span>
+                                <span class="detail-value" x-text="eventDetails?.src_country || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">City:</span>
+                                <span class="detail-value" x-text="eventDetails?.src_city || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Organization:</span>
+                                <span class="detail-value" x-text="eventDetails?.src_org || '-'"></span>
+                            </div>
+                        </div>
+
+                        <!-- Destination Info -->
+                        <div class="detail-section">
+                            <h3>Destination</h3>
+                            <div class="detail-item">
+                                <span class="detail-label">IP Address:</span>
+                                <span class="detail-value"><code x-text="eventDetails?.dest_ip || '-'"></code></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Port:</span>
+                                <span class="detail-value" x-text="eventDetails?.dest_port || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">MAC:</span>
+                                <span class="detail-value"><code x-text="eventDetails?.dest_mac || '-'"></code></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Country:</span>
+                                <span class="detail-value" x-text="eventDetails?.dest_country || '-'"></span>
+                            </div>
+                        </div>
+
+                        <!-- Network Info -->
+                        <div class="detail-section">
+                            <h3>Network</h3>
+                            <div class="detail-item">
+                                <span class="detail-label">Protocol:</span>
+                                <span class="detail-value" x-text="eventDetails?.protocol || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">App Protocol:</span>
+                                <span class="detail-value" x-text="eventDetails?.app_protocol || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Interface:</span>
+                                <span class="detail-value" x-text="eventDetails?.interface || '-'"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Signature ID:</span>
+                                <span class="detail-value" x-text="eventDetails?.signature_id || '-'"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- External Lookup Links -->
+                    <div x-show="eventDetails?.src_ip" class="external-links">
+                        <template x-if="isPrivateIP(eventDetails?.src_ip)">
+                            <div class="private-ip-notice">
+                                ℹ️ External lookups are not available for private (RFC1918) IP addresses.
+                            </div>
+                        </template>
+                        <a :href="'https://www.abuseipdb.com/check/' + eventDetails?.src_ip"
+                           target="_blank" class="external-link"
+                           :class="{ 'link-disabled': isPrivateIP(eventDetails?.src_ip) }"
+                           @click.prevent="isPrivateIP(eventDetails?.src_ip) && $event.preventDefault()"
+                           :aria-disabled="isPrivateIP(eventDetails?.src_ip)">
+                            🔍 AbuseIPDB
+                        </a>
+                        <a :href="'https://www.virustotal.com/gui/ip-address/' + eventDetails?.src_ip"
+                           target="_blank" class="external-link"
+                           :class="{ 'link-disabled': isPrivateIP(eventDetails?.src_ip) }"
+                           @click.prevent="isPrivateIP(eventDetails?.src_ip) && $event.preventDefault()"
+                           :aria-disabled="isPrivateIP(eventDetails?.src_ip)">
+                            🦠 VirusTotal
+                        </a>
+                        <a :href="'https://www.shodan.io/host/' + eventDetails?.src_ip"
+                           target="_blank" class="external-link"
+                           :class="{ 'link-disabled': isPrivateIP(eventDetails?.src_ip) }"
+                           @click.prevent="isPrivateIP(eventDetails?.src_ip) && $event.preventDefault()"
+                           :aria-disabled="isPrivateIP(eventDetails?.src_ip)">
+                            🔎 Shodan
+                        </a>
+                    </div>
+
+                    <!-- Add to Ignore List -->
+                    <div x-show="eventDetails?.src_ip" class="ignore-action">
+                        <button @click="openIgnoreFromEvent()" class="btn btn-secondary">
+                            🚫 Add to Ignore List
+                        </button>
+                        <small>Ignore future events from this source IP</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Webhooks Modal -->
+        <div x-show="showWebhooks"
+             @click.self="showWebhooks = false"
+             class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Webhooks</h2>
+                    <button @click="showWebhooks = false" class="close-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <p class="subtitle">
+                        Configure webhooks to receive notifications for threat events.
+                    </p>
+
+                    <button type="button" @click="showAddWebhook = true" class="btn btn-primary" style="margin-bottom: 1rem;">
+                        + Add Webhook
+                    </button>
+
+                    <div x-show="webhooks.length === 0" class="empty-state">
+                        No webhooks configured.
+                    </div>
+
+                    <div x-show="webhooks.length > 0" class="webhooks-list">
+                        <template x-for="webhook in webhooks" :key="webhook.id">
+                            <div class="webhook-item">
+                                <div class="webhook-item-content">
+                                    <div class="webhook-item-info">
+                                        <strong x-text="webhook.name"></strong>
+                                        <span class="badge webhook-type-badge" x-text="webhook.webhook_type"></span>
+                                        <span x-show="!webhook.enabled" class="badge webhook-disabled-badge">Disabled</span>
+                                        <div class="webhook-events">
+                                            Events:
+                                            <span x-show="webhook.event_alert">Alerts</span>
+                                            <span x-show="webhook.event_block">Blocks</span>
+                                        </div>
+                                        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                            Min Severity: <span x-text="getSeverityLabel(webhook.min_severity)"></span>
+                                        </div>
+                                    </div>
+                                    <div class="webhook-item-actions">
+                                        <button type="button" @click="testWebhook(webhook.id)" class="btn btn-sm btn-secondary">Test</button>
+                                        <button type="button" @click="editWebhook(webhook)" class="btn btn-sm btn-secondary">Edit</button>
+                                        <button type="button" @click="deleteWebhook(webhook.id)" class="btn btn-sm btn-danger">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Webhook Modal -->
+        <div x-show="showAddWebhook || showEditWebhook"
+             @click.self="showAddWebhook = false; showEditWebhook = false"
+             class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 x-text="showEditWebhook ? 'Edit Webhook' : 'Add Webhook'"></h2>
+                    <button @click="showAddWebhook = false; showEditWebhook = false" class="close-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveWebhook()">
+                        <div class="form-group">
+                            <label for="webhook_name">Name</label>
+                            <input type="text"
+                                   id="webhook_name"
+                                   x-model="webhookForm.name"
+                                   required
+                                   placeholder="Slack Alerts">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="webhook_type">Type</label>
+                            <select id="webhook_type" x-model="webhookForm.webhook_type" required>
+                                <option value="slack">Slack</option>
+                                <option value="discord">Discord</option>
+                                <option value="n8n">n8n / Generic</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="webhook_url">Webhook URL</label>
+                            <input type="url"
+                                   id="webhook_url"
+                                   x-model="webhookForm.url"
+                                   required
+                                   placeholder="https://hooks.slack.com/services/...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="min_severity">Minimum Severity to Alert</label>
+                            <select id="min_severity" x-model="webhookForm.min_severity">
+                                <option value="1">High Only</option>
+                                <option value="2">Medium and Above</option>
+                                <option value="3">All (including Low)</option>
+                            </select>
+                            <small>Only events at or above this severity will trigger the webhook</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Trigger Events</label>
+                            <div>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="webhookForm.event_alert">
+                                    IDS Alerts
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="webhookForm.event_block">
+                                    IPS Blocks
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" x-model="webhookForm.enabled">
+                                Enabled
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Webhook</button>
+                            <button type="button" @click="showAddWebhook = false; showEditWebhook = false" class="btn btn-secondary">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Ignore Rule Modal -->
+        <div x-show="showAddIgnoreRule || showEditIgnoreRule"
+             @click.self="showAddIgnoreRule = false; showEditIgnoreRule = false"
+             class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 x-text="showEditIgnoreRule ? 'Edit Ignore Rule' : 'Add Ignore Rule'"></h2>
+                    <button @click="showAddIgnoreRule = false; showEditIgnoreRule = false" class="close-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveIgnoreRule()">
+                        <div class="form-group">
+                            <label for="ignore_ip">IP Address</label>
+                            <input type="text"
+                                   id="ignore_ip"
+                                   x-model="ignoreRuleForm.ip_address"
+                                   required
+                                   placeholder="192.168.1.100"
+                                   pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                                   title="Enter a valid IPv4 address">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ignore_description">Description (optional)</label>
+                            <input type="text"
+                                   id="ignore_description"
+                                   x-model="ignoreRuleForm.description"
+                                   placeholder="Home Assistant, Pi-hole, etc.">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Ignore Events at Severity:</label>
+                            <div class="severity-checkboxes">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="ignoreRuleForm.ignore_high">
+                                    <span class="severity-badge severity-high">High</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="ignoreRuleForm.ignore_medium">
+                                    <span class="severity-badge severity-medium">Medium</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="ignoreRuleForm.ignore_low">
+                                    <span class="severity-badge severity-low">Low</span>
+                                </label>
+                            </div>
+                            <small>Only events at checked severity levels will be ignored from this IP</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Match IP When It Is The:</label>
+                            <div>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="ignoreRuleForm.match_source">
+                                    Source IP (traffic FROM this device)
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="ignoreRuleForm.match_destination">
+                                    Destination IP (traffic TO this device)
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" x-model="ignoreRuleForm.enabled">
+                                Enabled
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Rule</button>
+                            <button type="button" @click="showAddIgnoreRule = false; showEditIgnoreRule = false" class="btn btn-secondary">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container">
+            <div x-show="toast.show"
+                 x-transition
+                 :class="'toast toast-' + toast.type"
+                 x-text="toast.message">
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p><a href="https://github.com/Crosstalk-Solutions/unifi-toolkit" target="_blank">UI Toolkit - Threat Watch</a> v{{ version }} | by <a href="https://www.crosstalksolutions.com" target="_blank">Crosstalk Solutions</a> | <a href="#" id="report-issue-link">Report Issue</a></p>
+            <p class="footer-disclaimer">Not affiliated with Ubiquiti Inc. UniFi is a trademark of Ubiquiti Inc.</p>
+        </footer>
+    </div>
+
+    <script src="/threats/static/js/app.js"></script>
+    <script>
+        // Report Issue Link Builder
+        (function() {
+            const reportLink = document.getElementById('report-issue-link');
+            const GITHUB_REPO = 'https://github.com/Crosstalk-Solutions/unifi-toolkit';
+
+            reportLink.addEventListener('click', async function(e) {
+                e.preventDefault();
+
+                let body = `## Description
+<!-- Please describe the issue you're experiencing -->
+
+
+## Steps to Reproduce
+1.
+2.
+3.
+
+## Expected Behavior
+
+
+## Actual Behavior
+
+
+## Environment
+`;
+
+                try {
+                    const response = await fetch('/api/debug-info');
+                    const info = await response.json();
+
+                    body += `- **App Version:** ${info.app_version}\n`;
+                    body += `- **Tool:** Threat Watch ${info.tool_versions.threat_watch}\n`;
+                    body += `- **Deployment:** ${info.deployment.type}, Docker: ${info.deployment.docker ? 'Yes' : 'No'}, Python: ${info.deployment.python_version}\n`;
+                    if (info.gateway.model) {
+                        let gatewayStr = info.gateway.model;
+                        if (info.gateway.name) gatewayStr += ` (${info.gateway.name})`;
+                        body += `- **Gateway:** ${gatewayStr}, UniFi OS: ${info.gateway.is_unifi_os ? 'Yes' : 'No'}\n`;
+                        body += `- **IDS/IPS Support:** ${info.gateway.supports_ids_ips ? 'Yes' : 'No'}\n`;
+                        if (info.gateway.ips_mode) {
+                            body += `- **IPS Mode:** ${info.gateway.ips_mode}\n`;
+                        }
+                    }
+                } catch (error) {
+                    body += `- **Tool:** Threat Watch {{ version }}\n`;
+                }
+                body += `- **Browser:** ${navigator.userAgent}\n`;
+
+                const issueUrl = `${GITHUB_REPO}/issues/new?` + new URLSearchParams({
+                    title: '[Threat Watch] ',
+                    body: body,
+                    labels: 'bug,threat-watch'
+                }).toString();
+
+                window.open(issueUrl, '_blank');
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UI Toolkit - Dashboard</title>
+    <link rel="icon" type="image/jpeg" href="/static/images/favicon16x16.jpg">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <script>
+        // Apply saved theme immediately to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('unifi-toolkit-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <img src="/static/images/2022-Crosstalk-Solutions-Logo.png" alt="Crosstalk Solutions" class="header-logo">
+                </div>
+                <div class="header-center">
+                    <h1>UI Toolkit</h1>
+                </div>
+                <div class="header-right">
+                    <div class="header-actions">
+                        <div class="theme-toggle">
+                            <span class="theme-toggle-label" id="theme-label">Light</span>
+                            <button class="theme-toggle-btn" id="theme-toggle" title="Toggle dark/light mode">
+                                <span id="theme-icon">🌙</span>
+                            </button>
+                        </div>
+                        <button class="settings-btn" id="settings-btn" title="UniFi Settings">
+                            <span class="settings-icon">⚙️</span>
+                        </button>
+                        {% if auth_enabled %}
+                        <a href="/logout" class="logout-btn" title="Logout">
+                            <span class="logout-icon">🚪</span>
+                            <span class="logout-label">Logout</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- System Status Widget -->
+        <section class="system-status" id="system-status">
+            <div class="status-header" id="status-header">
+                <div class="status-summary">
+                    <div class="status-item" id="gateway-status">
+                        <span class="status-icon">🔌</span>
+                        <span class="status-label">Gateway</span>
+                        <span class="status-value" id="gateway-model">--</span>
+                    </div>
+                    <div class="status-item" id="cpu-status">
+                        <span class="status-icon">⚡</span>
+                        <span class="status-label">CPU</span>
+                        <span class="status-value" id="cpu-value">--%</span>
+                    </div>
+                    <div class="status-item" id="ram-status">
+                        <span class="status-icon">💾</span>
+                        <span class="status-label">RAM</span>
+                        <span class="status-value" id="ram-value">--%</span>
+                    </div>
+                    <div class="status-item" id="uptime-status">
+                        <span class="status-icon">⏱️</span>
+                        <span class="status-label">Uptime</span>
+                        <span class="status-value" id="uptime-value">--</span>
+                    </div>
+                    <div class="status-item" id="wan-status">
+                        <span class="status-icon" id="wan-icon">🌐</span>
+                        <span class="status-label">WAN</span>
+                        <span class="status-value" id="wan-value">--</span>
+                    </div>
+                    <div class="status-item" id="clients-status">
+                        <span class="status-icon">📱</span>
+                        <span class="status-label">Clients</span>
+                        <span class="status-value" id="clients-value">--</span>
+                    </div>
+                </div>
+                <button class="status-expand-btn" id="status-expand-btn" title="Show details">
+                    <span id="expand-icon">▼</span>
+                </button>
+            </div>
+            <div class="status-details" id="status-details">
+                <div class="status-details-grid">
+                    <!-- Device Counts -->
+                    <div class="detail-card">
+                        <h4>Network Devices</h4>
+                        <div class="detail-list">
+                            <div class="detail-row">
+                                <span>Access Points</span>
+                                <span id="ap-count">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>Switches</span>
+                                <span id="switch-count">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>Connected Clients</span>
+                                <span id="client-count-detail">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Gateway Details -->
+                    <div class="detail-card">
+                        <h4>Gateway Info</h4>
+                        <div class="detail-list">
+                            <div class="detail-row">
+                                <span>Model</span>
+                                <span id="gateway-model-detail">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>Firmware</span>
+                                <span id="gateway-version">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>WAN IP</span>
+                                <span id="wan-ip" class="wan-ip-hidden" title="Click to reveal" data-revealed="false">--</span>
+                            </div>
+                            <div class="detail-row" id="wan2-row" style="display: none;">
+                                <span>WAN2 IP</span>
+                                <span id="wan2-ip" class="wan-ip-hidden" title="Click to reveal" data-revealed="false">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>WAN Uptime</span>
+                                <span id="wan-availability">--</span>
+                            </div>
+                            <div class="detail-row" id="wan2-availability-row" style="display: none;">
+                                <span>WAN2 Uptime</span>
+                                <span id="wan2-availability">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Internet Stats -->
+                    <div class="detail-card">
+                        <h4>Internet Stats</h4>
+                        <div class="detail-list">
+                            <div class="detail-row">
+                                <span>Latency</span>
+                                <span id="wan-latency">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>Download</span>
+                                <span id="current-download">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>Upload</span>
+                                <span id="current-upload">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Network Health -->
+                    <div class="detail-card">
+                        <h4>Network Health</h4>
+                        <div class="detail-list">
+                            <div class="detail-row">
+                                <span class="health-label-group">
+                                    <span>WAN</span>
+                                    <span class="health-reason" id="wan-reason"></span>
+                                </span>
+                                <span class="health-badge" id="wan-health">--</span>
+                            </div>
+                            <div class="detail-row" id="wan2-health-row" style="display: none;">
+                                <span class="health-label-group">
+                                    <span>WAN2</span>
+                                    <span class="health-reason" id="wan2-reason"></span>
+                                </span>
+                                <span class="health-badge" id="wan2-health">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="health-label-group">
+                                    <span>LAN</span>
+                                    <span class="health-reason" id="lan-reason"></span>
+                                </span>
+                                <span class="health-badge" id="lan-health">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="health-label-group">
+                                    <span>WLAN</span>
+                                    <span class="health-reason" id="wlan-reason"></span>
+                                </span>
+                                <span class="health-badge" id="wlan-health">--</span>
+                            </div>
+                            <div class="detail-row" id="vpn-health-row" style="display: none;">
+                                <span class="health-label-group">
+                                    <span>VPN</span>
+                                    <span class="health-reason" id="vpn-reason"></span>
+                                </span>
+                                <span class="health-badge" id="vpn-health">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="status-loading" id="status-loading">
+                <span>Loading system status...</span>
+            </div>
+            <div class="status-error" id="status-error">
+                <span id="error-message">Unable to connect</span>
+                <a href="#" class="configure-link" id="configure-link">Configure UniFi Connection</a>
+            </div>
+        </section>
+
+        <!-- UniFi Configuration Modal -->
+        <div id="config-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>UniFi Controller Configuration</h2>
+                    <button class="close-btn" id="close-modal-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="config-form">
+                        <div class="form-group">
+                            <label for="controller_url">Controller URL *</label>
+                            <input type="text"
+                                   id="controller_url"
+                                   name="controller_url"
+                                   placeholder="https://192.168.200.1"
+                                   required>
+                            <small>UCG/UDM/UDR: https://192.168.x.x &nbsp;|&nbsp; Legacy controller: https://192.168.x.x:8443</small>
+                        </div>
+
+                        <div class="auth-info-box">
+                            <strong>Authentication:</strong>
+                            <p>
+                                🔐 <strong>API Key (recommended for UniFi OS):</strong> UCG, UDM, UDR, Cloud Key, UniFi OS Server<br>
+                                <small style="margin-left: 1.5em; color: var(--text-muted);">More reliable - no session timeouts, bypasses 2FA</small><br>
+                                🔑 <strong>Username/Password:</strong> All controllers (auto-detects UniFi OS vs legacy)<br>
+                                <small style="margin-left: 1.5em; color: var(--text-muted);">Required for legacy self-hosted Network Controller</small>
+                            </p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="api_key">API Key</label>
+                            <input type="password"
+                                   id="api_key"
+                                   name="api_key"
+                                   placeholder="Enter API key from UniFi Settings > Integrations">
+                            <small>Found in UniFi OS: Settings → Integrations → API Keys. Leave blank if using username/password.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text"
+                                   id="username"
+                                   name="username"
+                                   placeholder="admin"
+                                   value="admin">
+                            <small>Leave blank if using API key</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password"
+                                   id="password"
+                                   name="password"
+                                   placeholder="Your password">
+                            <small>Leave blank if using API key</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="site_id">Site ID</label>
+                            <input type="text"
+                                   id="site_id"
+                                   name="site_id"
+                                   value="default">
+                            <small>Use "default" for single-site setups. For multi-site, use the ID from the URL (not the friendly name). Example: if URL is <code>/manage/site/abc123/...</code> use <code>abc123</code></small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox"
+                                       id="verify_ssl"
+                                       name="verify_ssl">
+                                Verify SSL Certificates
+                            </label>
+                            <small>Uncheck for self-signed certificates (most UniFi deployments)</small>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Config</button>
+                            <button type="button" id="test-connection-btn" class="btn btn-secondary">
+                                Test Connection
+                            </button>
+                            <button type="button" id="cancel-config-btn" class="btn btn-secondary">
+                                Cancel
+                            </button>
+                        </div>
+
+                        <div id="config-message" class="message" style="display: none;"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tools Grid -->
+            <div class="tools-grid">
+                <!-- Wi-Fi Stalker Tool -->
+                <div class="tool-card">
+                    <div class="tool-icon">📡</div>
+                    <h2>Wi-Fi Stalker</h2>
+                    <p class="tool-description">
+                        Track specific Wi-Fi client devices through your UniFi infrastructure.
+                        Monitor connection status, detect roaming between access points, and maintain
+                        historical logs of device movements.
+                    </p>
+                    <div class="tool-features">
+                        <span class="feature-badge">Device Tracking</span>
+                        <span class="feature-badge">Roaming Detection</span>
+                        <span class="feature-badge">History Logs</span>
+                    </div>
+                    <div class="tool-bottom">
+                        <div class="tool-actions">
+                            <a href="/stalker/" class="btn btn-primary">Open Wi-Fi Stalker</a>
+                        </div>
+                        <div class="tool-version">v{{ stalker_version }}</div>
+                    </div>
+                </div>
+
+                <!-- Threat Watch Tool -->
+                <div class="tool-card" id="threat-watch-card">
+                    <div class="tool-icon">🛡️</div>
+                    <h2>Threat Watch</h2>
+                    <p class="tool-description">
+                        Monitor IDS/IPS events in real-time, view blocked threats and top attackers,
+                        and analyze security trends across your UniFi network.
+                    </p>
+                    <div class="tool-features">
+                        <span class="feature-badge">IDS/IPS Events</span>
+                        <span class="feature-badge">Top Attackers</span>
+                        <span class="feature-badge">Geo Lookup</span>
+                    </div>
+                    <div class="tool-status" id="threat-watch-status" style="display: none;"></div>
+                    <div class="tool-bottom">
+                        <div class="tool-actions">
+                            <a href="/threats/" class="btn btn-primary" id="threat-watch-btn">Open Threat Watch</a>
+                        </div>
+                        <div class="tool-version">v{{ threat_watch_version }}</div>
+                    </div>
+                </div>
+
+                <!-- Network Pulse Tool -->
+                <div class="tool-card">
+                    <div class="tool-icon">💓</div>
+                    <h2>Network Pulse</h2>
+                    <p class="tool-description">
+                        Real-time network monitoring dashboard designed for always-on displays.
+                        View bandwidth, AP status, top clients, and network health at a glance.
+                    </p>
+                    <div class="tool-features">
+                        <span class="feature-badge">Live Stats</span>
+                        <span class="feature-badge">Client Usage</span>
+                        <span class="feature-badge">Fullscreen Mode</span>
+                    </div>
+                    <div class="tool-bottom">
+                        <div class="tool-actions">
+                            <a href="/pulse/" class="btn btn-primary">Open Network Pulse</a>
+                        </div>
+                        <div class="tool-version">v{{ pulse_version }}</div>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon tool-icon-image">
+                        <img src="/static/images/ui-product-selector-logo-280x80.png" alt="UI Product Selector">
+                    </div>
+                    <h2>UI Product Selector</h2>
+                    <p class="tool-description">
+                        Build the perfect UniFi network. Select products, create shareable builds,
+                        and get recommendations tailored to your needs. Completely free.
+                    </p>
+                    <div class="tool-features">
+                        <span class="feature-badge">Product Selection</span>
+                        <span class="feature-badge">Build Sharing</span>
+                        <span class="feature-badge">Community</span>
+                    </div>
+                    <div class="tool-bottom">
+                        <div class="tool-actions">
+                            <a href="https://uiproductselector.com" target="_blank" class="btn btn-primary">Open UI Product Selector</a>
+                        </div>
+                        <div class="tool-version">&nbsp;</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Section -->
+            <div class="info-section">
+                <div class="info-card">
+                    <h3>About UI Toolkit</h3>
+                    <p>
+                        UI Toolkit is a comprehensive collection of tools designed to enhance
+                        your UniFi network management experience. Each tool is purpose-built to
+                        solve specific networking challenges and provide deep insights into your
+                        infrastructure.
+                    </p>
+                    <p>
+                        All tools share a common UniFi controller configuration, making it easy
+                        to manage multiple capabilities from a single installation.
+                    </p>
+                </div>
+
+                <div class="info-card">
+                    <h3>Getting Started</h3>
+                    <ol>
+                        <li>Select a tool from the grid above</li>
+                        <li>Configure your UniFi controller connection</li>
+                        <li>Start using the tool's features</li>
+                        <li>If you like this project, consider <a href="https://ko-fi.com/crosstalk" target="_blank">buying me a coffee</a>!</li>
+                    </ol>
+                    <p>
+                        Each tool has its own configuration and data, but they all leverage
+                        shared infrastructure for authentication and UniFi API access.
+                    </p>
+                </div>
+
+                <div class="info-card">
+                    <h3>System Requirements</h3>
+                    <ul>
+                        <li>UniFi Network Controller (Cloud Key, UDM, UCG, or standalone)</li>
+                        <li>Python 3.9 - 3.12</li>
+                        <li>Access to UniFi Controller API</li>
+                        <li>Modern web browser with JavaScript enabled</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Rogue Support Banner -->
+            <div class="promo-banner">
+                <a href="https://Rogue.Support" target="_blank" rel="noopener noreferrer" title="Rogue Support - Networking Consultation for Home Users">
+                    <img src="/static/images/RS-banner-new3-1200x400.png" alt="Rogue Support - Your Uber for Computer Networking">
+                </a>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>
+                <a href="https://github.com/Crosstalk-Solutions/unifi-toolkit" target="_blank">UI Toolkit</a>
+                v{{ app_version }} | by
+                <a href="https://www.crosstalksolutions.com" target="_blank">Crosstalk Solutions</a>
+            </p>
+            <p class="footer-links">
+                <a href="/health">Health Check</a> |
+                <a href="#" id="report-issue-link" target="_blank">Report Issue</a> |
+                <a href="https://github.com/Crosstalk-Solutions/unifi-toolkit#readme" target="_blank">Documentation</a> |
+                <a href="https://ko-fi.com/crosstalk" target="_blank" class="donate-link">☕ Buy Me a Coffee</a>
+            </p>
+            <p class="footer-disclaimer">
+                This project is not affiliated with, endorsed by, or sponsored by Ubiquiti Inc.
+                UniFi is a trademark of Ubiquiti Inc.
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Theme toggle functionality
+        (function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const themeIcon = document.getElementById('theme-icon');
+            const themeLabel = document.getElementById('theme-label');
+
+            function updateThemeUI(theme) {
+                if (theme === 'dark') {
+                    themeIcon.textContent = '☀️';
+                    themeLabel.textContent = 'Dark';
+                } else {
+                    themeIcon.textContent = '🌙';
+                    themeLabel.textContent = 'Light';
+                }
+            }
+
+            // Initialize UI based on current theme
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            updateThemeUI(currentTheme);
+
+            // Toggle theme on click
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('unifi-toolkit-theme', newTheme);
+                updateThemeUI(newTheme);
+            });
+        })();
+
+        // System Status Widget
+        (function() {
+            const statusHeader = document.getElementById('status-header');
+            const statusDetails = document.getElementById('status-details');
+            const statusExpandBtn = document.getElementById('status-expand-btn');
+            const statusLoading = document.getElementById('status-loading');
+            const statusError = document.getElementById('status-error');
+            const errorMessage = document.getElementById('error-message');
+
+            // Track if we've successfully loaded data at least once
+            let hasLoadedOnce = false;
+
+            // Format uptime from seconds to human readable
+            function formatUptime(seconds) {
+                if (!seconds) return '--';
+                const days = Math.floor(seconds / 86400);
+                const hours = Math.floor((seconds % 86400) / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+
+                if (days > 0) {
+                    return `${days}d ${hours}h`;
+                } else if (hours > 0) {
+                    return `${hours}h ${minutes}m`;
+                } else {
+                    return `${minutes}m`;
+                }
+            }
+
+            // Format throughput (bytes/sec to bits/sec, human readable)
+            function formatThroughput(bytesPerSec) {
+                if (!bytesPerSec || bytesPerSec === 0) return '--';
+
+                // Convert bytes to bits
+                const bitsPerSec = bytesPerSec * 8;
+                const kbps = bitsPerSec / 1000;
+                const mbps = kbps / 1000;
+
+                if (mbps >= 1) {
+                    return `${mbps.toFixed(1)} Mbps`;
+                } else if (kbps >= 1) {
+                    return `${kbps.toFixed(1)} Kbps`;
+                } else {
+                    return `${Math.round(bitsPerSec)} bps`;
+                }
+            }
+
+            // Set health badge and reason
+            function setHealthBadge(elementId, status, reason) {
+                const element = document.getElementById(elementId);
+                if (!element) return;
+
+                element.textContent = status || '--';
+                element.className = 'health-badge';
+
+                if (status === 'ok') {
+                    element.classList.add('ok');
+                    element.textContent = 'OK';
+                } else if (status === 'warning') {
+                    element.classList.add('warning');
+                    element.textContent = 'WARN';
+                } else if (status === 'error' || status === 'unknown') {
+                    element.classList.add('error');
+                    element.textContent = status === 'unknown' ? 'N/A' : 'ERR';
+                }
+
+                // Set the reason if provided
+                const reasonId = elementId.replace('-health', '-reason');
+                const reasonElement = document.getElementById(reasonId);
+                if (reasonElement) {
+                    reasonElement.textContent = reason || '';
+                }
+            }
+
+            // Toggle accordion
+            statusExpandBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isExpanded = statusDetails.classList.contains('expanded');
+                statusDetails.classList.toggle('expanded');
+                statusExpandBtn.classList.toggle('expanded');
+            });
+
+            // Also toggle when clicking header
+            statusHeader.addEventListener('click', function() {
+                const isExpanded = statusDetails.classList.contains('expanded');
+                statusDetails.classList.toggle('expanded');
+                statusExpandBtn.classList.toggle('expanded');
+            });
+
+            // WAN IP click to reveal functionality
+            function setupWanIpToggle(elementId) {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+
+                el.addEventListener('click', function() {
+                    const ip = this.dataset.ip;
+                    if (!ip || ip === '--') return;
+
+                    const isRevealed = this.dataset.revealed === 'true';
+                    if (isRevealed) {
+                        this.textContent = '(click to show)';
+                        this.dataset.revealed = 'false';
+                        this.title = 'Click to reveal';
+                    } else {
+                        this.textContent = ip;
+                        this.dataset.revealed = 'true';
+                        this.title = 'Click to hide';
+                    }
+                });
+            }
+
+            setupWanIpToggle('wan-ip');
+            setupWanIpToggle('wan2-ip');
+
+            // Load system status
+            async function loadSystemStatus() {
+                // Only show loading indicator on initial load (before we have data)
+                if (!hasLoadedOnce) {
+                    statusLoading.classList.add('visible');
+                    statusHeader.classList.add('hidden');
+                }
+                statusError.classList.remove('visible');
+
+                try {
+                    const response = await fetch('/api/system-status');
+                    const data = await response.json();
+
+                    statusLoading.classList.remove('visible');
+
+                    if (!data.configured) {
+                        statusHeader.classList.add('hidden');
+                        statusError.classList.add('visible');
+                        errorMessage.textContent = 'UniFi controller not configured';
+                        hasLoadedOnce = false;
+                        return;
+                    }
+
+                    if (!data.connected) {
+                        statusHeader.classList.add('hidden');
+                        statusError.classList.add('visible');
+                        errorMessage.textContent = data.error || 'Unable to connect to UniFi controller';
+                        hasLoadedOnce = false;
+                        return;
+                    }
+
+                    // Show the status header and mark that we've loaded successfully
+                    statusHeader.classList.remove('hidden');
+                    hasLoadedOnce = true;
+
+                    const system = data.system;
+                    const health = data.health || {};
+
+                    // Update summary values
+                    document.getElementById('gateway-model').textContent = system.gateway_model || 'Unknown';
+                    document.getElementById('cpu-value').textContent = system.cpu_utilization ? `${Math.round(system.cpu_utilization)}%` : '--%';
+                    document.getElementById('ram-value').textContent = system.mem_utilization ? `${Math.round(system.mem_utilization)}%` : '--%';
+                    document.getElementById('uptime-value').textContent = formatUptime(system.uptime);
+                    document.getElementById('wan-value').textContent = system.wan_status === 'connected' ? 'Online' : 'Offline';
+                    document.getElementById('wan-icon').textContent = system.wan_status === 'connected' ? '🟢' : '🔴';
+                    document.getElementById('clients-value').textContent = system.client_count || '0';
+
+                    // Update detail values
+                    document.getElementById('ap-count').textContent = system.ap_count || '0';
+                    document.getElementById('switch-count').textContent = system.switch_count || '0';
+                    document.getElementById('client-count-detail').textContent = system.client_count || '0';
+                    document.getElementById('gateway-model-detail').textContent = system.gateway_model || 'Unknown';
+                    document.getElementById('gateway-version').textContent = system.gateway_version || '--';
+                    // Store WAN IP and show obfuscated by default
+                    const wanIpEl = document.getElementById('wan-ip');
+                    const wanIp = system.wan_ip || '--';
+                    wanIpEl.dataset.ip = wanIp;
+                    wanIpEl.textContent = wanIp === '--' ? '--' : '(click to show)';
+                    wanIpEl.dataset.revealed = 'false';
+
+                    // WAN availability from health stats
+                    const wanAvail = health.wan?.availability;
+                    document.getElementById('wan-availability').textContent = wanAvail ? `${wanAvail.toFixed(2)}%` : '--';
+
+                    // Check for WAN2 (multi-WAN)
+                    if (health.wan2) {
+                        document.getElementById('wan2-row').style.display = 'flex';
+                        document.getElementById('wan2-availability-row').style.display = 'flex';
+                        // Store WAN2 IP and show obfuscated by default
+                        const wan2IpEl = document.getElementById('wan2-ip');
+                        const wan2Ip = health.wan2.wan_ip || '--';
+                        wan2IpEl.dataset.ip = wan2Ip;
+                        wan2IpEl.textContent = wan2Ip === '--' ? '--' : '(click to show)';
+                        wan2IpEl.dataset.revealed = 'false';
+                        const wan2Avail = health.wan2.availability;
+                        document.getElementById('wan2-availability').textContent = wan2Avail ? `${wan2Avail.toFixed(2)}%` : '--';
+                    } else {
+                        document.getElementById('wan2-row').style.display = 'none';
+                        document.getElementById('wan2-availability-row').style.display = 'none';
+                    }
+
+                    // Internet stats from www health
+                    const wwwLatency = health.www?.latency;
+                    document.getElementById('wan-latency').textContent = wwwLatency ? `${Math.round(wwwLatency)} ms` : '--';
+                    document.getElementById('current-download').textContent = formatThroughput(health.www?.rx_bytes);
+                    document.getElementById('current-upload').textContent = formatThroughput(health.www?.tx_bytes);
+
+                    // Update health badges with reasons
+                    setHealthBadge('wan-health', health.wan?.status, health.wan?.status_reason);
+                    setHealthBadge('lan-health', health.lan?.status, health.lan?.status_reason);
+                    setHealthBadge('wlan-health', health.wlan?.status, health.wlan?.status_reason);
+
+                    // WAN2 health (multi-WAN)
+                    if (health.wan2) {
+                        document.getElementById('wan2-health-row').style.display = 'flex';
+                        setHealthBadge('wan2-health', health.wan2.status, health.wan2.status_reason);
+                    } else {
+                        document.getElementById('wan2-health-row').style.display = 'none';
+                    }
+
+                    // VPN health - only show if configured (not in error state with "not configured")
+                    if (health.vpn && !(health.vpn.status === 'error' && health.vpn.status_reason === 'not configured')) {
+                        document.getElementById('vpn-health-row').style.display = 'flex';
+                        setHealthBadge('vpn-health', health.vpn.status, health.vpn.status_reason);
+                    } else {
+                        document.getElementById('vpn-health-row').style.display = 'none';
+                    }
+
+
+                } catch (error) {
+                    console.error('Failed to load system status:', error);
+                    statusLoading.classList.remove('visible');
+                    statusError.classList.add('visible');
+                    errorMessage.textContent = 'Failed to load system status';
+                }
+            }
+
+            // Load on page load and signal when done
+            loadSystemStatus().then(() => {
+                // Dispatch event to signal that system status is loaded and cache is ready
+                window.systemStatusLoadedFired = true;
+                window.dispatchEvent(new CustomEvent('systemStatusLoaded'));
+            });
+
+            // Refresh every 60 seconds
+            setInterval(loadSystemStatus, 60000);
+        })();
+
+        // UniFi Configuration Modal
+        (function() {
+            const configModal = document.getElementById('config-modal');
+            const configureLink = document.getElementById('configure-link');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const cancelConfigBtn = document.getElementById('cancel-config-btn');
+            const configForm = document.getElementById('config-form');
+            const testConnectionBtn = document.getElementById('test-connection-btn');
+            const configMessage = document.getElementById('config-message');
+
+            // Show config message
+            function showConfigMessage(message, type = 'info') {
+                configMessage.textContent = message;
+                configMessage.className = `message ${type}`;
+                configMessage.style.display = 'block';
+                setTimeout(() => {
+                    configMessage.style.display = 'none';
+                }, 5000);
+            }
+
+            // Open modal
+            function openModal() {
+                configModal.style.display = 'flex';
+                loadExistingConfig();
+            }
+
+            // Close modal
+            function closeModal() {
+                configModal.style.display = 'none';
+                configMessage.style.display = 'none';
+            }
+
+            // Load existing config
+            async function loadExistingConfig() {
+                try {
+                    const response = await fetch('/api/config/unifi');
+                    if (response.ok) {
+                        const config = await response.json();
+                        document.getElementById('controller_url').value = config.controller_url || '';
+                        document.getElementById('username').value = config.username || 'admin';
+                        document.getElementById('site_id').value = config.site_id || 'default';
+                        document.getElementById('verify_ssl').checked = config.verify_ssl || false;
+                    }
+                } catch (error) {
+                    console.log('No existing config found');
+                }
+            }
+
+            // Save config (tests connection first, only saves if successful)
+            async function saveConfig(e) {
+                e.preventDefault();
+
+                const formData = new FormData(configForm);
+                const data = {
+                    controller_url: formData.get('controller_url'),
+                    username: formData.get('username') || 'admin',
+                    password: formData.get('password') || null,
+                    api_key: formData.get('api_key') || null,
+                    site_id: formData.get('site_id') || 'default',
+                    verify_ssl: formData.get('verify_ssl') === 'on'
+                };
+
+                // Validate that either password or API key is provided
+                if (!data.password && !data.api_key) {
+                    showConfigMessage('Please provide either a password or API key', 'error');
+                    return;
+                }
+
+                // Disable save button while testing
+                const saveBtn = configForm.querySelector('button[type="submit"]');
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Testing connection...';
+
+                try {
+                    // First, test the connection with the provided credentials
+                    showConfigMessage('Testing connection before saving...', 'info');
+
+                    const testResponse = await fetch('/api/config/unifi/test', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    const testResult = await testResponse.json();
+
+                    if (!testResult.connected) {
+                        showConfigMessage(`Connection failed: ${testResult.error || 'Unable to connect'}. Configuration was NOT saved.`, 'error');
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save Config';
+                        return;
+                    }
+
+                    // Connection successful - now save the config
+                    saveBtn.textContent = 'Saving...';
+
+                    const response = await fetch('/api/config/unifi', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        let message = `Connection verified (${testResult.client_count || 0} clients found). Configuration saved!`;
+                        showConfigMessage(message, 'success');
+                        // Reload system status after saving
+                        setTimeout(() => {
+                            closeModal();
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showConfigMessage(result.detail || 'Failed to save configuration', 'error');
+                    }
+                } catch (error) {
+                    showConfigMessage('Error: ' + error.message, 'error');
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Config';
+                }
+            }
+
+            // Test connection (tests the form data, not saved config)
+            async function testConnection() {
+                const formData = new FormData(configForm);
+                const data = {
+                    controller_url: formData.get('controller_url'),
+                    username: formData.get('username') || 'admin',
+                    password: formData.get('password') || null,
+                    api_key: formData.get('api_key') || null,
+                    site_id: formData.get('site_id') || 'default',
+                    verify_ssl: formData.get('verify_ssl') === 'on'
+                };
+
+                // Validate that either password or API key is provided
+                if (!data.password && !data.api_key) {
+                    showConfigMessage('Please provide either a password or API key', 'error');
+                    return;
+                }
+
+                if (!data.controller_url) {
+                    showConfigMessage('Please enter a controller URL', 'error');
+                    return;
+                }
+
+                testConnectionBtn.disabled = true;
+                testConnectionBtn.textContent = 'Testing...';
+                showConfigMessage('Testing connection to UniFi controller...', 'info');
+
+                try {
+                    const response = await fetch('/api/config/unifi/test', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    const result = await response.json();
+
+                    if (result.connected) {
+                        let message = `✓ Connected successfully! Found ${result.client_count || 0} clients`;
+                        if (result.site_name) {
+                            message += ` in site "${result.site_name}"`;
+                        }
+                        showConfigMessage(message, 'success');
+                    } else {
+                        showConfigMessage(`✗ Connection failed: ${result.error || 'Unknown error'}`, 'error');
+                    }
+                } catch (error) {
+                    showConfigMessage('Error testing connection: ' + error.message, 'error');
+                } finally {
+                    testConnectionBtn.disabled = false;
+                    testConnectionBtn.textContent = 'Test Connection';
+                }
+            }
+
+            // Event listeners
+            const settingsBtn = document.getElementById('settings-btn');
+
+            settingsBtn.addEventListener('click', openModal);
+
+            configureLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                openModal();
+            });
+
+            closeModalBtn.addEventListener('click', closeModal);
+            cancelConfigBtn.addEventListener('click', closeModal);
+            configForm.addEventListener('submit', saveConfig);
+            testConnectionBtn.addEventListener('click', testConnection);
+
+            // Close modal when clicking outside
+            configModal.addEventListener('click', (e) => {
+                if (e.target === configModal) {
+                    closeModal();
+                }
+            });
+        })();
+
+        // Gateway Check for Threat Watch
+        (function() {
+            const threatWatchCard = document.getElementById('threat-watch-card');
+            const threatWatchBtn = document.getElementById('threat-watch-btn');
+            const threatWatchStatus = document.getElementById('threat-watch-status');
+
+            async function checkGatewayAvailability(forceRefresh = false) {
+                // Reset classes
+                threatWatchStatus.classList.remove('status-success');
+                threatWatchStatus.style.color = '';
+
+                try {
+                    // Add cache-busting param if forcing refresh
+                    const url = forceRefresh ? '/api/config/gateway-check?refresh=1' : '/api/config/gateway-check';
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    if (!data.configured) {
+                        // UniFi not configured - show as unavailable
+                        threatWatchCard.classList.add('tool-unavailable');
+                        threatWatchBtn.classList.add('disabled');
+                        threatWatchBtn.style.pointerEvents = 'none';
+                        threatWatchStatus.style.display = 'block';
+                        threatWatchStatus.innerHTML = '⚠️ <strong>UniFi not configured.</strong> Use settings ⚙️ above.';
+                        return;
+                    }
+
+                    if (!data.has_gateway) {
+                        // No gateway found - Threat Watch unavailable
+                        threatWatchCard.classList.add('tool-unavailable');
+                        threatWatchBtn.classList.add('disabled');
+                        threatWatchBtn.style.pointerEvents = 'none';
+                        threatWatchStatus.style.display = 'block';
+                        threatWatchStatus.innerHTML = '⚠️ <strong>No UniFi Gateway found.</strong> IDS/IPS requires a gateway (UDM, UCG, UXG, USG).';
+                    } else if (!data.supports_ids_ips) {
+                        // Gateway found but doesn't support IDS/IPS
+                        const gatewayName = data.gateway_name || 'your gateway';
+                        const isLegacyController = gatewayName.includes('Legacy Controller');
+                        threatWatchCard.classList.add('tool-unavailable');
+                        threatWatchBtn.classList.add('disabled');
+                        threatWatchBtn.style.pointerEvents = 'none';
+                        threatWatchStatus.style.display = 'block';
+                        if (isLegacyController) {
+                            threatWatchStatus.innerHTML = `⚠️ <strong>IDS/IPS API not available.</strong> Legacy controllers don't expose these endpoints.`;
+                        } else {
+                            threatWatchStatus.innerHTML = `⚠️ <strong>${gatewayName}</strong> doesn't support IDS/IPS.`;
+                        }
+                    } else {
+                        // Gateway with IDS/IPS found - Threat Watch available
+                        threatWatchCard.classList.remove('tool-unavailable');
+                        threatWatchBtn.classList.remove('disabled');
+                        threatWatchBtn.style.pointerEvents = 'auto';
+
+                        // Only show notification on dashboard if IDS/IPS is disabled
+                        // When enabled, status shows inside Threat Watch instead
+                        if (data.ips_enabled === false) {
+                            // IDS/IPS is disabled - show warning with "Check Again" link
+                            threatWatchStatus.style.display = 'block';
+                            threatWatchStatus.innerHTML = `ℹ️ <strong>IDS/IPS is disabled</strong> on ${data.gateway_name}.<span class="check-again" onclick="window.recheckGateway()">I enabled it - check again</span>`;
+                        } else {
+                            // IDS/IPS is enabled - no notification needed on dashboard
+                            threatWatchStatus.style.display = 'none';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to check gateway availability:', error);
+                    // Don't block access on error - let the tool handle it
+                }
+            }
+
+            // Expose recheck function globally for the "Check Again" link
+            window.recheckGateway = async function() {
+                threatWatchStatus.innerHTML = '⏳ Checking...';
+                // Invalidate cache by making a direct API call
+                try {
+                    await fetch('/api/config/gateway-check?invalidate=1');
+                } catch (e) {}
+                // Small delay then recheck
+                setTimeout(() => checkGatewayAvailability(true), 500);
+            };
+
+            // Wait for system status to load first (which populates the cache)
+            // This prevents the race condition where gateway-check runs before cache is ready
+            window.addEventListener('systemStatusLoaded', () => {
+                checkGatewayAvailability();
+            }, { once: true });
+
+            // Fallback: if system status hasn't loaded within 5 seconds, check anyway
+            setTimeout(() => {
+                if (!window.systemStatusLoadedFired) {
+                    checkGatewayAvailability();
+                }
+            }, 5000);
+        })();
+
+        // Report Issue Link Builder
+        (function() {
+            const reportLink = document.getElementById('report-issue-link');
+            const GITHUB_REPO = 'https://github.com/Crosstalk-Solutions/unifi-toolkit';
+
+            reportLink.addEventListener('click', async function(e) {
+                e.preventDefault();
+
+                // Build issue body with system info
+                let body = `## Description
+<!-- Please describe the issue you're experiencing -->
+
+
+## Steps to Reproduce
+<!-- What steps lead to the issue? -->
+1.
+2.
+3.
+
+## Expected Behavior
+<!-- What did you expect to happen? -->
+
+
+## Actual Behavior
+<!-- What actually happened? -->
+
+
+## Environment
+`;
+
+                try {
+                    // Fetch debug info from API
+                    const response = await fetch('/api/debug-info');
+                    const info = await response.json();
+
+                    // Add app versions
+                    body += `- **App Version:** ${info.app_version}\n`;
+                    body += `- **Tool Versions:**\n`;
+                    body += `  - Wi-Fi Stalker: ${info.tool_versions.wifi_stalker}\n`;
+                    body += `  - Threat Watch: ${info.tool_versions.threat_watch}\n`;
+                    body += `  - Network Pulse: ${info.tool_versions.network_pulse}\n`;
+
+                    // Add deployment info
+                    body += `- **Deployment:**\n`;
+                    body += `  - Type: ${info.deployment.type}\n`;
+                    body += `  - Docker: ${info.deployment.docker ? 'Yes' : 'No'}\n`;
+                    body += `  - Python: ${info.deployment.python_version}\n`;
+
+                    // Add gateway info if available
+                    if (info.gateway.model) {
+                        body += `- **Gateway:**\n`;
+                        body += `  - Model: ${info.gateway.model}`;
+                        if (info.gateway.name) {
+                            body += ` (${info.gateway.name})`;
+                        }
+                        body += `\n`;
+                        body += `  - UniFi OS: ${info.gateway.is_unifi_os ? 'Yes' : 'No'}\n`;
+                        body += `  - IDS/IPS Support: ${info.gateway.supports_ids_ips ? 'Yes' : 'No'}\n`;
+                        if (info.gateway.ips_mode) {
+                            body += `  - IPS Mode: ${info.gateway.ips_mode}\n`;
+                        }
+                    } else {
+                        body += `- **Gateway:** Not configured or not connected\n`;
+                    }
+
+                } catch (error) {
+                    // If we can't fetch debug info, just include basic info
+                    body += `- **App Version:** {{ app_version }}\n`;
+                    body += `- _(Could not fetch additional debug info)_\n`;
+                }
+
+                // Add browser info (client-side)
+                body += `- **Browser:** ${navigator.userAgent}\n`;
+
+                // Build the GitHub URL
+                const issueUrl = `${GITHUB_REPO}/issues/new?` + new URLSearchParams({
+                    title: '',
+                    body: body,
+                    labels: 'bug'
+                }).toString();
+
+                // Open in new tab
+                window.open(issueUrl, '_blank');
+            });
+        })();
+    </script>
+</body>
+</html>

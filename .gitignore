@@ -1,0 +1,10 @@
+.env
+API.env
+API2.env
+*.env
+logs/
+data/
+docker-deploy.tar.gz
+__pycache__/
+*.pyc
+.DS_Store

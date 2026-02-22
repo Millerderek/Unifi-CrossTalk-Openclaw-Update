@@ -1,0 +1,23 @@
+# UniFi Toolkit — Python dependencies
+#
+# Core
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9     # Form data (SAML ACS POST)
+
+# Database
+sqlalchemy>=2.0.29
+aiosqlite>=0.20.0           # Async SQLite driver
+alembic>=1.13.1
+
+# SAML SSO (requires libxml2 + libxmlsec1 system packages)
+python3-saml>=1.16.0
+
+# Templating
+jinja2>=3.1.3
+
+# HTTP client (for Site Manager API fetches)
+httpx>=0.27.0
+
+# Utilities
+python-dotenv>=1.0.1

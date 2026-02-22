@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Pulse - Real-time Network Monitor</title>
+    <link rel="icon" type="image/jpeg" href="/static/images/favicon16x16.jpg">
+    <link rel="stylesheet" href="/pulse/static/css/styles.css">
+    <script>
+        // Apply saved theme immediately (default to dark for monitoring displays)
+        (function() {
+            const savedTheme = localStorage.getItem('unifi-toolkit-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div x-data="networkPulse()" x-init="init()" class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-left">
+                <a href="/" class="back-link">← Back to Dashboard</a>
+            </div>
+            <div class="header-center">
+                <h1>💓 Network Pulse</h1>
+            </div>
+            <div class="header-right">
+                <button @click="toggleFullscreen()" class="fullscreen-toggle" title="Toggle Fullscreen">
+                    <span x-text="isFullscreen ? '⛶' : '⛶'"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-main">
+            <!-- Row 1: Status Cards -->
+            <div class="status-cards">
+                <!-- Gateway Card -->
+                <div class="status-card">
+                    <div class="card-icon">🖥️</div>
+                    <div class="card-content">
+                        <div class="card-label">Gateway</div>
+                        <div class="card-value" x-text="data.gateway?.model || 'Loading...'"></div>
+                        <div class="card-detail">
+                            <span x-show="data.gateway?.cpu_utilization !== null">
+                                CPU: <span x-text="formatPercent(data.gateway?.cpu_utilization)"></span>
+                            </span>
+                            <span x-show="data.gateway?.mem_utilization !== null">
+                                RAM: <span x-text="formatPercent(data.gateway?.mem_utilization)"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WAN Card -->
+                <div class="status-card" :class="{'status-ok': data.wan?.status === 'ok', 'status-error': data.wan?.status !== 'ok'}">
+                    <div class="card-icon">🌐</div>
+                    <div class="card-content">
+                        <div class="card-label">WAN Status</div>
+                        <div class="card-value">
+                            <span x-text="data.wan?.status === 'ok' ? '🟢 Online' : '🔴 ' + (data.wan?.status || 'Unknown')"></span>
+                        </div>
+                        <div class="card-detail" x-show="data.wan?.availability">
+                            <span x-text="formatPercent(data.wan?.availability)"></span> uptime
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clients Card -->
+                <div class="status-card">
+                    <div class="card-icon">👥</div>
+                    <div class="card-content">
+                        <div class="card-label">Clients</div>
+                        <div class="card-value" x-text="data.devices?.clients || 0"></div>
+                        <div class="card-detail">
+                            <span x-text="data.devices?.wireless_clients || 0"></span>W /
+                            <span x-text="data.devices?.wired_clients || 0"></span>E
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UniFi Devices Card -->
+                <div class="status-card">
+                    <div class="card-icon">📶</div>
+                    <div class="card-content">
+                        <div class="card-label">UniFi Devices</div>
+                        <div class="card-value" x-text="(data.devices?.aps || 0) + (data.devices?.switches || 0)"></div>
+                        <div class="card-detail">
+                            <span x-text="data.devices?.aps || 0"></span> APs /
+                            <span x-text="data.devices?.switches || 0"></span> SW
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Current Throughput + Access Points -->
+            <div class="throughput-ap-row">
+                <!-- Current Throughput -->
+                <div class="chart-card throughput-card">
+                    <h3>Current Throughput</h3>
+                    <div class="throughput-display">
+                        <div class="throughput-item download">
+                            <span class="throughput-arrow">↓</span>
+                            <span class="throughput-label">Download</span>
+                            <span class="throughput-value" x-text="formatBandwidth(data.current_rx_rate)"></span>
+                        </div>
+                        <div class="throughput-divider"></div>
+                        <div class="throughput-item upload">
+                            <span class="throughput-arrow">↑</span>
+                            <span class="throughput-label">Upload</span>
+                            <span class="throughput-value" x-text="formatBandwidth(data.current_tx_rate)"></span>
+                        </div>
+                        <div class="throughput-divider" x-show="data.wan?.latency"></div>
+                        <div class="throughput-item latency" x-show="data.wan?.latency">
+                            <span class="throughput-arrow">⏱</span>
+                            <span class="throughput-label">Latency</span>
+                            <span class="throughput-value" x-text="data.wan?.latency?.toFixed(1) + ' ms'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Access Points -->
+                <div class="ap-section">
+                    <h3>Access Points <span class="section-hint">(Click for detail)</span></h3>
+                    <div class="ap-grid">
+                        <template x-for="ap in data.access_points" :key="ap.mac">
+                            <div class="ap-card clickable"
+                                 :class="{'ap-online': ap.state === 1, 'ap-offline': ap.state !== 1}"
+                                 @click="window.location.href = '/pulse/ap/' + encodeURIComponent(ap.mac)"
+                                 role="button"
+                                 tabindex="0"
+                                 @keydown.enter="window.location.href = '/pulse/ap/' + encodeURIComponent(ap.mac)">
+                                <div class="ap-status-dot" :class="ap.state === 1 ? 'online' : 'offline'"></div>
+                                <div class="ap-name" x-text="ap.name"></div>
+                                <div class="ap-clients">
+                                    <span x-text="ap.num_sta"></span> clients
+                                </div>
+                                <div class="ap-model" x-text="ap.model"></div>
+                            </div>
+                        </template>
+                        <div x-show="!data.access_points || data.access_points.length === 0" class="no-aps">
+                            No access points found
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 3: Charts -->
+            <div class="charts-row">
+                <!-- Clients by Band -->
+                <div class="chart-card">
+                    <h3>Clients by Band <a href="#" class="chart-toggle" @click.prevent="toggleBandWired()">(<span x-text="hideBandWired ? 'show' : 'hide'"></span> Wired)</a></h3>
+                    <div class="chart-container">
+                        <canvas id="bandChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Clients by SSID -->
+                <div class="chart-card">
+                    <h3>Clients by SSID <a href="#" class="chart-toggle" @click.prevent="toggleSsidWired()">(<span x-text="hideSsidWired ? 'show' : 'hide'"></span> Wired)</a></h3>
+                    <div class="chart-container">
+                        <canvas id="ssidChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Top Bandwidth -->
+                <div class="chart-card">
+                    <h3>Top Bandwidth</h3>
+                    <div class="chart-container chart-container-bar">
+                        <canvas id="bandwidthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 4: Top Clients & Network Health -->
+            <div class="bottom-section">
+                <!-- Top Clients -->
+                <div class="panel top-clients-panel">
+                    <h3>Top Clients by Bandwidth</h3>
+                    <div class="clients-list">
+                        <template x-for="(client, index) in data.top_clients" :key="client.mac">
+                            <div class="client-row">
+                                <span class="client-rank" x-text="index + 1"></span>
+                                <div class="client-info">
+                                    <span class="client-name" x-text="client.name"></span>
+                                    <span class="client-details">
+                                        <span x-show="client.ip" x-text="client.ip"></span>
+                                        <span x-show="client.ip && (client.network || client.essid)"> · </span>
+                                        <span x-show="client.network || client.essid" x-text="client.network || client.essid"></span>
+                                        <span x-show="client.is_wired"> · Wired</span>
+                                    </span>
+                                </div>
+                                <span class="client-bandwidth" x-text="formatBytes(client.total_bytes)"></span>
+                                <span class="client-type" x-text="client.is_wired ? '🔌' : '📶'"></span>
+                            </div>
+                        </template>
+                        <div x-show="!data.top_clients || data.top_clients.length === 0" class="no-clients">
+                            No client data available
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Health -->
+                <div class="panel health-panel">
+                    <h3>Network Health</h3>
+                    <div class="health-list">
+                        <div class="health-row" x-show="data.health?.wan">
+                            <span class="health-label">WAN</span>
+                            <span class="health-status" :class="'status-' + (data.health?.wan?.status || 'unknown')">
+                                <span x-text="getStatusEmoji(data.health?.wan?.status)"></span>
+                                <span x-text="(data.health?.wan?.status || 'unknown').toUpperCase()"></span>
+                            </span>
+                        </div>
+                        <div class="health-row" x-show="data.health?.wan2">
+                            <span class="health-label">WAN2</span>
+                            <span class="health-status" :class="'status-' + (data.health?.wan2?.status || 'unknown')">
+                                <span x-text="getStatusEmoji(data.health?.wan2?.status)"></span>
+                                <span x-text="(data.health?.wan2?.status || 'unknown').toUpperCase()"></span>
+                            </span>
+                        </div>
+                        <div class="health-row" x-show="data.health?.lan">
+                            <span class="health-label">LAN</span>
+                            <span class="health-status" :class="'status-' + (data.health?.lan?.status || 'unknown')">
+                                <span x-text="getStatusEmoji(data.health?.lan?.status)"></span>
+                                <span x-text="(data.health?.lan?.status || 'unknown').toUpperCase()"></span>
+                            </span>
+                            <span class="health-detail" x-show="data.health?.lan?.num_user" x-text="'(' + data.health?.lan?.num_user + ' devices)'"></span>
+                        </div>
+                        <div class="health-row" x-show="data.health?.wlan">
+                            <span class="health-label">WLAN</span>
+                            <span class="health-status" :class="'status-' + (data.health?.wlan?.status || 'unknown')">
+                                <span x-text="getStatusEmoji(data.health?.wlan?.status)"></span>
+                                <span x-text="(data.health?.wlan?.status || 'unknown').toUpperCase()"></span>
+                            </span>
+                            <span class="health-detail" x-show="data.health?.wlan?.num_user" x-text="'(' + data.health?.wlan?.num_user + ' clients)'"></span>
+                        </div>
+                        <div class="health-row" x-show="data.health?.vpn && data.health?.vpn?.status !== 'unknown'">
+                            <span class="health-label">VPN</span>
+                            <span class="health-status" :class="'status-' + (data.health?.vpn?.status || 'unknown')">
+                                <span x-text="getStatusEmoji(data.health?.vpn?.status)"></span>
+                                <span x-text="(data.health?.vpn?.status || 'unknown').toUpperCase()"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="dashboard-footer">
+            <div class="footer-left">
+                <span class="connection-status" :class="isConnected ? 'connected' : 'disconnected'">
+                    <span x-text="isConnected ? '🟢' : '🔴'"></span>
+                    <span x-text="isConnected ? 'Connected' : 'Disconnected'"></span>
+                </span>
+            </div>
+            <div class="footer-center">
+                <span>Last refresh: <span x-text="formatTime(data.last_refresh)"></span></span>
+                <span class="separator">|</span>
+                <span>Auto-refresh: <span x-text="data.refresh_interval || 60"></span>s</span>
+            </div>
+            <div class="footer-right">
+                <a href="#" id="report-issue-link" class="footer-link">Report Issue</a>
+                <span class="separator">|</span>
+                <span class="version">v{{ version }}</span>
+            </div>
+        </footer>
+
+        <!-- Loading Overlay -->
+        <div x-show="isLoading" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading dashboard data...</div>
+        </div>
+
+        <!-- Error Toast -->
+        <div x-show="error" x-transition class="error-toast">
+            <span x-text="error"></span>
+            <button @click="error = null" class="toast-close">&times;</button>
+        </div>
+    </div>
+
+    <script src="/pulse/static/js/app.js"></script>
+    <script>
+        // Report Issue Link Builder
+        (function() {
+            const reportLink = document.getElementById('report-issue-link');
+            const GITHUB_REPO = 'https://github.com/Crosstalk-Solutions/unifi-toolkit';
+
+            reportLink.addEventListener('click', async function(e) {
+                e.preventDefault();
+
+                let body = `## Description
+<!-- Please describe the issue you're experiencing -->
+
+
+## Steps to Reproduce
+1.
+2.
+3.
+
+## Expected Behavior
+
+
+## Actual Behavior
+
+
+## Environment
+`;
+
+                try {
+                    const response = await fetch('/api/debug-info');
+                    const info = await response.json();
+
+                    body += `- **App Version:** ${info.app_version}\n`;
+                    body += `- **Tool:** Network Pulse ${info.tool_versions.network_pulse}\n`;
+                    body += `- **Deployment:** ${info.deployment.type}, Docker: ${info.deployment.docker ? 'Yes' : 'No'}, Python: ${info.deployment.python_version}\n`;
+                    if (info.gateway.model) {
+                        let gatewayStr = info.gateway.model;
+                        if (info.gateway.name) gatewayStr += ` (${info.gateway.name})`;
+                        body += `- **Gateway:** ${gatewayStr}, UniFi OS: ${info.gateway.is_unifi_os ? 'Yes' : 'No'}\n`;
+                    }
+                } catch (error) {
+                    body += `- **Tool:** Network Pulse {{ version }}\n`;
+                }
+                body += `- **Browser:** ${navigator.userAgent}\n`;
+
+                const issueUrl = `${GITHUB_REPO}/issues/new?` + new URLSearchParams({
+                    title: '[Network Pulse] ',
+                    body: body,
+                    labels: 'bug,network-pulse'
+                }).toString();
+
+                window.open(issueUrl, '_blank');
+            });
+        })();
+    </script>
+</body>
+</html>
